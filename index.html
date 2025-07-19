@@ -1,176 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Another DinoRun</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #fff; overflow: hidden; font-family: sans-serif; }
-    canvas { display: block; margin: 0 auto; background: #eee; border: 2px solid #000; }
-    #instructions {
-      text-align: center;
-      margin-top: 10px;
-      font-size: 14px;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Another Dino Run</title>
+<style>
+  body {
+    margin: 0;
+    background: #fff;
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #scoreboard {
+    font-size: 20px;
+    margin: 10px;
+  }
+  #game {
+    position: relative;
+    width: 1000px;
+    height: 300px;
+    background: #fff;
+    border: 4px solid #333;
+    overflow: hidden;
+    border-radius: 12px;
+  }
+  #ground {
+    position: absolute;
+    bottom: 0;
+    height: 50px;
+    width: 200%;
+    background: repeating-linear-gradient(to right, #999 0px, #999 10px, #777 10px, #777 20px);
+    animation: groundMove linear infinite;
+    animation-duration: 1.5s;
+    z-index: 1;
+  }
+  @keyframes groundMove {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .entity {
+    position: absolute;
+    bottom: 50px;
+    font-size: 60px;
+    transform: scaleX(-1);
+    z-index: 2;
+  }
+  #dino {
+    left: 150px;
+  }
+  #monster {
+    left: -200px;
+    font-size: 180px;
+    filter: brightness(0);
+    z-index: 0;
+    bottom: 0; /* benar-benar menapak tanah */
+  }
+  .obstacle, .powerup {
+    position: absolute;
+    font-size: 50px;
+    z-index: 3;
+  }
+  .obstacle {
+    bottom: 50px;
+  }
+  .flying {
+    bottom: 80px;
+    font-size: 35px;
+  }
+  .duck-required {
+    width: 10px;
+    height: 180px;
+    top: 0;
+    background-color: black;
+    user-select: none;
+    position: absolute;
+  }
+  .powerup.jump {
+    bottom: 130px;
+    font-size: 50px;
+  }
+  .powerup.ground {
+    bottom: 60px;
+    font-size: 50px;
+  }
+  #info {
+    margin: 8px;
+    color: #444;
+  }
+  #instructions {
+    max-width: 1000px;
+    margin-top: 16px;
+    font-size: 16px;
+    color: #222;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #f9f9f9;
+  }
+  #instructions h3 {
+    margin-top: 0;
+  }
+</style>
 </head>
 <body>
-  <canvas id="game" width="800" height="200"></canvas>
-  <div id="instructions">
-    <p>⬆️ Lompat | ⬇️ Menunduk | Shift: Sprint (gunakan stamina)</p>
-    <p>🚫 Hindari rintangan! | ⚡ Isi stamina | ❤️ Tambah nyawa | ⬇️ Perlambat monster</p>
-  </div>
-  <script>
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
 
-    const dino = {
-      x: 100, y: 160, vy: 0, width: 20, height: 20,
-      jumping: false, ducking: false, stamina: 100, health: 3
-    };
+<!-- HTML lainnya tetap sama -->
 
-    let monsterX = 10;
-    let obstacles = [];
-    let powerups = [];
-    let gravity = 1;
-    let frame = 0;
-    let speed = 6;
-    let monsterSpeed = 2;
+<script>
+// Pada bagian createPowerup
+function createPowerup() {
+  const p = document.createElement('div');
+  p.classList.add('powerup');
+  let effect;
+  let r = Math.random();
+  if (r < 0.07) {
+    p.textContent = '⚡';
+    p.classList.add('ground');
+    effect = 'stamina';
+  } else if (r < 0.11) {
+    p.textContent = '⬇️';
+    p.classList.add('ground');
+    effect = 'slowMonster';
+  } else if (r < 0.13) {
+    p.textContent = '❤️';
+    p.classList.add('ground');
+    effect = 'health';
+  } else if (r < 0.17) {
+    p.textContent = '⚡';
+    p.classList.add('jump');
+    effect = 'staminaJump';
+  } else {
+    return; // tidak spawn powerup
+  }
+  let startX = game.clientWidth + 300 + Math.random() * 800;
+  p.style.left = startX + 'px';
+  game.appendChild(p);
+  obstacles.push({ el: p, pos: startX, type: 'powerup', effect });
+}
 
-    function drawDino() {
-      ctx.fillStyle = dino.ducking ? "green" : "lime";
-      let h = dino.ducking ? 10 : dino.height;
-      let y = dino.ducking ? dino.y + 10 : dino.y;
-      ctx.fillRect(dino.x, y, dino.width, h);
+// Perbaikan pada pengambilan powerup
+if (near && obs.type === 'powerup') {
+  const powerupY = parseInt(obs.el.style.bottom || '50');
+  const dinoY = dinoBottom;
+  const overlap = Math.abs(dinoY - powerupY) < 60; // deteksi ketinggian hampir sama
+  if (overlap) {
+    if (obs.effect === 'stamina') {
+      stamina = Math.min(stamina + 35, maxStamina);
     }
-
-    function drawMonster() {
-      ctx.fillStyle = "black";
-      ctx.beginPath();
-      ctx.arc(monsterX, 170, 25, 0, Math.PI * 2);
-      ctx.fill();
+    if (obs.effect === 'slowMonster') {
+      monsterSpeed = Math.max(monsterSpeed - 0.08, 0.03);
     }
-
-    function drawObstacles() {
-      ctx.fillStyle = "brown";
-      for (let obs of obstacles) {
-        if (obs.type === "cactus") {
-          ctx.fillRect(obs.x, 160, 15, 40);
-        } else if (obs.type === "bat") {
-          ctx.fillRect(obs.x, 130, 20, 10);
-        } else if (obs.type === "bar") {
-          ctx.fillRect(obs.x, 0, 10, 100);
-        }
-        obs.x -= speed;
-      }
-      obstacles = obstacles.filter(o => o.x > -20);
+    if (obs.effect === 'staminaJump') {
+      stamina = Math.min(stamina + 20, maxStamina);
     }
-
-    function drawPowerups() {
-      ctx.fillStyle = "blue";
-      for (let p of powerups) {
-        if (p.kind === "stamina") ctx.fillText("⚡", p.x, p.y);
-        else if (p.kind === "slow") ctx.fillText("⬇️", p.x, p.y);
-        else if (p.kind === "health") ctx.fillText("❤️", p.x, p.y);
-        p.x -= speed;
-      }
-      powerups = powerups.filter(p => p.x > -20);
+    if (obs.effect === 'health') {
+      if (health < 3) health++;
+      updateScoreboard();
     }
-
-    function update() {
-      // gravity
-      if (dino.jumping || dino.vy < 0) {
-        dino.y += dino.vy;
-        dino.vy += gravity;
-        if (dino.y >= 160) {
-          dino.y = 160;
-          dino.jumping = false;
-        }
-      }
-
-      // monster chase
-      if (monsterX < dino.x - 50) monsterX += monsterSpeed;
-
-      // collision
-      for (let o of obstacles) {
-        let dx = dino.x + dino.width > o.x && dino.x < o.x + 15;
-        let dy = false;
-        if (o.type === "cactus") dy = dino.y + dino.height > 160;
-        if (o.type === "bat") dy = dino.y < 140;
-        if (o.type === "bar") dy = dino.y < 100 && !dino.ducking;
-        if (dx && dy) {
-          dino.health--;
-          o.x = -100;
-        }
-      }
-
-      for (let p of powerups) {
-        if (dino.x + dino.width > p.x && dino.x < p.x + 15 &&
-            dino.y + dino.height > p.y - 10 && dino.y < p.y + 10) {
-          if (p.kind === "stamina") dino.stamina = 100;
-          if (p.kind === "slow") monsterX -= 30;
-          if (p.kind === "health" && dino.health < 3) dino.health++;
-          p.x = -100;
-        }
-      }
-
-      if (monsterX + 25 >= dino.x) dino.health = 0;
-
-      // spawn
-      if (frame % 100 === 0) {
-        let t = ["cactus", "bat", "bar"][Math.floor(Math.random() * 3)];
-        obstacles.push({ x: 800, type: t });
-      }
-      if (frame % 200 === 0) {
-        let k = ["stamina", "slow", "health"][Math.floor(Math.random() * 3)];
-        let py = k === "stamina" ? 150 : k === "slow" ? 160 : 170;
-        powerups.push({ x: 800, y: py, kind: k });
-      }
-
-      frame++;
-    }
-
-    function drawUI() {
-      ctx.fillStyle = "black";
-      ctx.fillText(`❤️ ${dino.health}  ⚡ ${Math.floor(dino.stamina)}`, 10, 20);
-    }
-
-    function gameLoop() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawDino();
-      drawMonster();
-      drawObstacles();
-      drawPowerups();
-      drawUI();
-      update();
-
-      if (dino.health > 0) requestAnimationFrame(gameLoop);
-      else ctx.fillText("Game Over", 350, 100);
-    }
-
-    gameLoop();
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowUp" && !dino.jumping && !dino.ducking) {
-        dino.jumping = true;
-        dino.vy = -12;
-      }
-      if (e.key === "ArrowDown") dino.ducking = true;
-      if (e.key === "Shift" && dino.stamina > 0) {
-        speed = 9;
-        dino.stamina -= 1;
-      }
-    });
-
-    document.addEventListener("keyup", (e) => {
-      if (e.key === "ArrowDown") dino.ducking = false;
-      if (e.key === "Shift") speed = 6;
-    });
-
-    setInterval(() => {
-      if (speed === 6 && dino.stamina < 100) dino.stamina += 1;
-    }, 100);
-  </script>
+    obs.el.remove();
+    obstacles.splice(idx, 1);
+  }
+}
+</script>
 </body>
 </html>
