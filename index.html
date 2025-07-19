@@ -68,17 +68,25 @@
     bottom: 80px; /* kelelawar lebih rendah, harus menunduk */
     font-size: 35px; /* kecil */
   }
+  /* balok hitam panjang dari atas sampai dekat tanah */
   .duck-required {
+    width: 25px;
+    height: 220px;
     top: 0;
     bottom: auto;
-    height: 90px; /* lebih pendek */
-    width: 25px; /* lebih tipis */
-    font-size: 70px; /* sesuaikan ukuran font */
-    line-height: 70px;
-    color: black;
-    transform: scaleX(-1);
-    text-align: center;
+    background-color: black;
+    border-radius: 3px;
+    transform: none;
     user-select: none;
+  }
+  /* powerup yang harus dilompat letaknya di udara */
+  .powerup.jump {
+    bottom: 130px;
+    font-size: 50px;
+  }
+  .powerup.ground {
+    bottom: 60px;
+    font-size: 50px;
   }
   #info {
     margin: 8px;
@@ -114,13 +122,14 @@
   <h3>Petunjuk Permainan</h3>
   <ul>
     <li><b>🦕 Dino</b> kamu harus bertahan selama mungkin dari kejaran monster 🦖.</li>
-    <li><b>Space</b> = Melompat (untuk menghindari kaktus dan kelelawar)</li>
+    <li><b>Space</b> = Melompat (untuk menghindari kaktus dan kelelawar serta powerup udara)</li>
     <li><b>Shift</b> = Sprint / Lari cepat (menjauh dari monster)</li>
-    <li><b>↓ (Arrow Down)</b> = Menunduk (untuk menghindari kelelawar dan tembok hitam)</li>
+    <li><b>↓ (Arrow Down)</b> = Menunduk (untuk menghindari kelelawar dan balok hitam panjang)</li>
     <li><b>Enter</b> = Mulai ulang jika game over</li>
-    <li>Hindari rintangan: <b>🌵 kaktus</b>, <b>🦇 kelelawar</b>, dan <b>⬛ tembok hitam</b> (wajib menunduk)</li>
-    <li>Ambil <b>⚡</b> untuk kecepatan ekstra</li>
-    <li>Ambil <b>⬇️</b> untuk memperlambat monster</li>
+    <li>Hindari rintangan: <b>🌵 kaktus</b>, <b>🦇 kelelawar</b>, dan <b>⬛ balok hitam</b> (wajib menunduk)</li>
+    <li>Ambil <b>⚡</b> (powerup tanah) untuk kecepatan ekstra</li>
+    <li>Ambil <b>⬇️</b> (powerup tanah) untuk memperlambat monster</li>
+    <li>Ambil <b>🐇</b> (powerup udara) untuk kecepatan ekstra, harus dilompat</li>
     <li><b>Health:</b> Kamu punya 3 nyawa. Tabrak rintangan = -1 nyawa</li>
     <li><b>Game Over:</b> Jika nyawa habis atau tertangkap monster</li>
   </ul>
@@ -139,7 +148,7 @@ let isDucking = false;
 let dinoBottom = 50;
 let velocity = 0;
 const gravity = 0.7;
-// Turunkan jump velocity supaya lompat tidak terlalu tinggi tapi cukup hindari kelelawar
+// Turunkan jump velocity supaya lompat cukup untuk kelelawar dan powerup udara
 const jumpVelocity = 16;
 let groundSpeed = 6;
 let sprinting = false;
@@ -162,14 +171,14 @@ function createObstacle() {
   // Obstacle jenis duck-required muncul random tapi jarang
   let rand = Math.random();
   let type;
-  if (rand < 0.15 && lastType !== 'duck-required') {
+  if (rand < 0.12 && lastType !== 'duck-required') {
     type = 'duck-required';
   } else if (lastType === 'flying') {
     type = 'ground';
   } else if (lastType === 'ground') {
-    type = Math.random() < 0.25 ? 'flying' : 'ground';
+    type = Math.random() < 0.3 ? 'flying' : 'ground';
   } else {
-    type = Math.random() < 0.25 ? 'flying' : 'ground';
+    type = Math.random() < 0.3 ? 'flying' : 'ground';
   }
 
   const obs = document.createElement('div');
@@ -179,8 +188,6 @@ function createObstacle() {
     obs.textContent = '🦇';
   } else if (type === 'duck-required') {
     obs.classList.add('duck-required');
-    obs.style.bottom = 'auto';
-    obs.textContent = '⬛';
   } else {
     obs.textContent = '🌵';
   }
@@ -193,13 +200,26 @@ function createObstacle() {
 function createPowerup() {
   const p = document.createElement('div');
   p.classList.add('powerup');
-  const isSpeed = Math.random() < 0.5;
-  p.textContent = isSpeed ? '⚡' : '⬇️';
-  let startX = game.clientWidth + 300 + Math.random() * 500;
+  let effect;
+  // Chance kecil untuk powerup, dan bagi 3 jenis
+  let r = Math.random();
+  if (r < 0.3) {
+    p.textContent = '⚡';
+    p.classList.add('ground');
+    effect = 'speed';
+  } else if (r < 0.55) {
+    p.textContent = '⬇️';
+    p.classList.add('ground');
+    effect = 'slowMonster';
+  } else {
+    p.textContent = '🐇';
+    p.classList.add('jump');
+    effect = 'speedJump';
+  }
+  let startX = game.clientWidth + 300 + Math.random() * 800;
   p.style.left = startX + 'px';
-  p.style.bottom = '60px';
   game.appendChild(p);
-  obstacles.push({ el: p, pos: startX, type: 'powerup', effect: p.textContent });
+  obstacles.push({ el: p, pos: startX, type: 'powerup', effect });
 }
 
 function resetGame() {
@@ -258,11 +278,18 @@ function gameLoop() {
         }
       }
     } else if (near && obs.type === 'powerup') {
-      if (obs.effect === '⚡') {
+      if (obs.effect === 'speed') {
         groundSpeed = Math.min(groundSpeed + 2, 14);
+        ground.style.animationDuration = (1.5 / (groundSpeed / 6)) + 's';
       }
-      if (obs.effect === '⬇️') {
+      if (obs.effect === 'slowMonster') {
         monsterSpeed = Math.max(monsterSpeed - 0.05, 0.05);
+      }
+      if (obs.effect === 'speedJump') {
+        if (!isJumping) {
+          isJumping = true;
+          velocity = jumpVelocity;
+        }
       }
       obs.el.remove();
       obstacles.splice(idx, 1);
@@ -297,8 +324,13 @@ function gameLoop() {
 
   obstacleTimer -= groundSpeed;
   if (obstacleTimer <= 0) {
-    Math.random() < 0.25 ? createPowerup() : createObstacle();
-    obstacleTimer = 300 + Math.random() * 300;
+    // powerups sangat jarang (30% chance)
+    if (Math.random() < 0.3) {
+      createPowerup();
+    } else {
+      createObstacle();
+    }
+    obstacleTimer = 300 + Math.random() * 500;
   }
 
   requestAnimationFrame(gameLoop);
