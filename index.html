@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Another Dino Run</title>
+<title>Another Dino Run with Stamina</title>
 <style>
   body {
     margin: 0;
@@ -55,6 +55,7 @@
     font-size: 180px;
     filter: brightness(0);
     z-index: 0;
+    bottom: 50px; /* pastikan menapak tanah */
   }
   .obstacle, .powerup {
     position: absolute;
@@ -65,10 +66,9 @@
     bottom: 50px;
   }
   .flying {
-    bottom: 80px; /* kelelawar lebih rendah, harus menunduk */
-    font-size: 35px; /* kecil */
+    bottom: 80px; /* kelelawar lebih rendah */
+    font-size: 35px;
   }
-  /* balok hitam panjang dari atas sampai dekat tanah */
   .duck-required {
     width: 25px;
     height: 220px;
@@ -76,10 +76,8 @@
     bottom: auto;
     background-color: black;
     border-radius: 3px;
-    transform: none;
     user-select: none;
   }
-  /* powerup yang harus dilompat letaknya di udara */
   .powerup.jump {
     bottom: 130px;
     font-size: 50px;
@@ -109,7 +107,7 @@
 </head>
 <body>
 
-<div id="scoreboard">Score: 0 | Health: 3 | High Score: 0</div>
+<div id="scoreboard">Score: 0 | Health: 3 | Stamina: 100 | High Score: 0</div>
 <div id="game">
   <div id="monster" class="entity">🦖</div>
   <div id="dino" class="entity">🦕</div>
@@ -123,16 +121,17 @@
   <ul>
     <li><b>🦕 Dino</b> kamu harus bertahan selama mungkin dari kejaran monster 🦖.</li>
     <li><b>Space</b> = Melompat (untuk menghindari kaktus, kelelawar, balok hitam, dan mengambil powerup udara)</li>
-    <li><b>Shift</b> = Sprint / Lari cepat (menjauh dari monster)</li>
+    <li><b>Shift</b> = Sprint / Lari cepat (menggunakan stamina)</li>
     <li><b>↓ (Arrow Down)</b> = Menunduk (untuk menghindari kelelawar dan balok hitam panjang)</li>
     <li><b>Enter</b> = Mulai ulang jika game over</li>
     <li>Hindari rintangan: <b>🌵 kaktus</b>, <b>🦇 kelelawar</b>, dan <b>⬛ balok hitam</b> (wajib menunduk)</li>
-    <li>Ambil powerup tanah: <b>⚡</b> (kecepatan ekstra), <b>⬇️</b> (perlambat monster), <b>❤️</b> (tambah darah)</li>
-    <li>Ambil powerup udara (harus dilompat): <b>⚡</b> (kecepatan ekstra)</li>
+    <li>Ambil powerup tanah: <b>⚡</b> (isi stamina), <b>⬇️</b> (perlambat monster), <b>❤️</b> (tambah darah)</li>
+    <li>Ambil powerup udara (harus dilompat): <b>⚡</b> (isi stamina)</li>
     <li><b>Health:</b> Kamu punya 3 nyawa. Tabrak rintangan = -1 nyawa</li>
+    <li><b>Stamina:</b> 100 maksimal. Sprint memakai stamina, berjalan biasa mengisi stamina perlahan.</li>
     <li><b>Game Over:</b> Jika nyawa habis atau tertangkap monster</li>
   </ul>
-  <p><i>Tips:</i> Sprint bisa menjauh dari monster, tapi hati-hati terhadap rintangan!</p>
+  <p><i>Tips:</i> Gunakan sprint dengan bijak dan jaga stamina agar selalu cukup!</p>
 </div>
 
 <script>
@@ -157,26 +156,51 @@ let monsterSpeed = 0.2;
 let score = 0;
 let highScore = localStorage.getItem('dinoEmojiScore') || 0;
 let health = 3;
+let stamina = 100;
+let maxStamina = 100;
+let staminaRegenRate = 0.2; // per frame berjalan biasa
+let staminaDrainRate = 0.8; // per frame sprint
 let gameOver = false;
 
 function updateScoreboard() {
-  scoreboard.textContent = `Score: ${score} | Health: ${health} | High Score: ${highScore}`;
+  scoreboard.textContent = `Score: ${score} | Health: ${health} | Stamina: ${Math.floor(stamina)} | High Score: ${highScore}`;
+}
+
+// Fungsi untuk cek jarak antar obstacles agar tidak terlalu berdekatan dan tidak beda tipe bertumpuk
+function canPlaceObstacle(newPos, newType) {
+  for (let obs of obstacles) {
+    if (Math.abs(obs.pos - newPos) < 220) {
+      // jarak kurang dari 220px terlalu dekat
+      // Cegah obstacle berbeda tipe (ground/flying/duck-required) berdekatan atau tumpang tindih
+      if (obs.type !== newType) return false;
+    }
+  }
+  return true;
 }
 
 function createObstacle() {
-  let lastType = obstacles.length ? obstacles[obstacles.length - 1].type : null;
-
-  let rand = Math.random();
   let type;
-  if (rand < 0.12 && lastType !== 'duck-required') {
-    type = 'duck-required';
-  } else if (lastType === 'flying') {
-    type = 'ground';
-  } else if (lastType === 'ground') {
-    type = Math.random() < 0.3 ? 'flying' : 'ground';
-  } else {
-    type = Math.random() < 0.3 ? 'flying' : 'ground';
-  }
+  const lastType = obstacles.length ? obstacles[obstacles.length - 1].type : null;
+
+  // Tentukan type dengan aturan tidak menumpuk tipe berbeda dan acak
+  let attempts = 0;
+  do {
+    if (Math.random() < 0.12 && lastType !== 'duck-required') {
+      type = 'duck-required';
+    } else if (lastType === 'flying') {
+      type = 'ground';
+    } else if (lastType === 'ground') {
+      type = Math.random() < 0.3 ? 'flying' : 'ground';
+    } else {
+      type = Math.random() < 0.3 ? 'flying' : 'ground';
+    }
+
+    // Random posisi awal obstacle di luar kanan layar
+    var startX = game.clientWidth + 300 + Math.random() * 600;
+
+    attempts++;
+    if (attempts > 10) break; // mencegah infinite loop
+  } while (!canPlaceObstacle(startX, type));
 
   const obs = document.createElement('div');
   obs.classList.add('obstacle');
@@ -188,7 +212,6 @@ function createObstacle() {
   } else {
     obs.textContent = '🌵';
   }
-  let startX = game.clientWidth + 300 + Math.random() * 500;
   obs.style.left = startX + 'px';
   game.appendChild(obs);
   obstacles.push({ el: obs, pos: startX, type });
@@ -199,22 +222,22 @@ function createPowerup() {
   p.classList.add('powerup');
   let effect;
   let r = Math.random();
-  if (r < 0.2) {
+  if (r < 0.15) {
     p.textContent = '⚡';
     p.classList.add('ground');
-    effect = 'speed';
-  } else if (r < 0.4) {
+    effect = 'stamina';
+  } else if (r < 0.28) {
     p.textContent = '⬇️';
     p.classList.add('ground');
     effect = 'slowMonster';
-  } else if (r < 0.45) {
+  } else if (r < 0.33) {
     p.textContent = '❤️';
     p.classList.add('ground');
     effect = 'health';
   } else {
     p.textContent = '⚡';
     p.classList.add('jump');
-    effect = 'speedJump';
+    effect = 'staminaJump';
   }
   let startX = game.clientWidth + 300 + Math.random() * 800;
   p.style.left = startX + 'px';
@@ -227,10 +250,12 @@ function resetGame() {
   obstacles = [];
   score = 0;
   health = 3;
+  stamina = maxStamina;
   gameOver = false;
   dinoBottom = 50;
   velocity = 0;
   isJumping = false;
+  sprinting = false;
   monsterLeft = -200;
   dino.style.bottom = dinoBottom + 'px';
   monster.style.left = monsterLeft + 'px';
@@ -253,6 +278,21 @@ function gameLoop() {
     dino.style.bottom = dinoBottom + 'px';
   }
 
+  // Update stamina
+  if (sprinting) {
+    stamina -= staminaDrainRate;
+    if (stamina <= 0) {
+      stamina = 0;
+      sprinting = false;
+      groundSpeed = 6;
+      ground.style.animationDuration = '1.5s';
+    }
+  } else if (stamina < maxStamina) {
+    stamina += staminaRegenRate;
+    if (stamina > maxStamina) stamina = maxStamina;
+  }
+
+  // Update obstacles
   obstacles.forEach((obs, idx) => {
     obs.pos -= groundSpeed;
     obs.el.style.left = obs.pos + 'px';
@@ -278,18 +318,18 @@ function gameLoop() {
         }
       }
     } else if (near && obs.type === 'powerup') {
-      if (obs.effect === 'speed') {
-        groundSpeed = Math.min(groundSpeed + 2, 14);
-        ground.style.animationDuration = (1.5 / (groundSpeed / 6)) + 's';
+      if (obs.effect === 'stamina') {
+        stamina = Math.min(stamina + 35, maxStamina);
       }
       if (obs.effect === 'slowMonster') {
         monsterSpeed = Math.max(monsterSpeed - 0.05, 0.05);
       }
-      if (obs.effect === 'speedJump') {
+      if (obs.effect === 'staminaJump') {
         if (!isJumping) {
           isJumping = true;
           velocity = jumpVelocity;
         }
+        stamina = Math.min(stamina + 20, maxStamina);
       }
       if (obs.effect === 'health') {
         if (health < 3) health++;
@@ -310,6 +350,7 @@ function gameLoop() {
     }
   });
 
+  // Monster gerak
   if (!sprinting) {
     if (monsterLeft < 120) monsterLeft += monsterSpeed;
   } else {
@@ -333,9 +374,10 @@ function gameLoop() {
     } else {
       createObstacle();
     }
-    obstacleTimer = 300 + Math.random() * 500;
+    obstacleTimer = 300 + Math.random() * 600;
   }
 
+  updateScoreboard();
   requestAnimationFrame(gameLoop);
 }
 
@@ -347,9 +389,11 @@ document.addEventListener('keydown', e => {
     }
   }
   if (e.code === 'ShiftLeft') {
-    sprinting = true;
-    groundSpeed = Math.min(groundSpeed + 4, 14);
-    ground.style.animationDuration = (1.5 / (groundSpeed / 6)) + 's';
+    if (stamina > 0) {
+      sprinting = true;
+      groundSpeed = Math.min(groundSpeed + 4, 14);
+      ground.style.animationDuration = (1.5 / (groundSpeed / 6)) + 's';
+    }
   }
   if (e.code === 'ArrowDown') {
     isDucking = true;
