@@ -68,6 +68,15 @@
     bottom: 80px; /* turunkan agar terlihat harus menunduk */
     font-size: 35px; /* kecilkan kelelawar */
   }
+  .duck-required {
+    top: 0;
+    bottom: auto;
+    height: 150px;
+    font-size: 100px;
+    line-height: 130px;
+    color: black;
+    transform: scaleX(-1);
+  }
   #info {
     margin: 8px;
     color: #444;
@@ -104,11 +113,11 @@
     <li><b>🦕 Dino</b> kamu harus bertahan selama mungkin dari kejaran monster 🦖.</li>
     <li><b>Space</b> = Melompat (untuk menghindari kaktus dan kelelawar)</li>
     <li><b>Shift</b> = Sprint / Lari cepat (menjauh dari monster)</li>
-    <li><b>↓ (Arrow Down)</b> = Menunduk (untuk menghindari kelelawar juga)</li>
+    <li><b>↓ (Arrow Down)</b> = Menunduk (untuk menghindari kelelawar dan tembok hitam)</li>
     <li><b>Enter</b> = Mulai ulang jika game over</li>
-    <li>Hindari rintangan: <b>🌵 kaktus</b>, <b>🦇 kelelawar</b> (bisa dilompati atau ditunduk)</li>
+    <li>Hindari rintangan: <b>🌵 kaktus</b>, <b>🦇 kelelawar</b>, dan <b>⬛ tembok hitam</b> (wajib menunduk)</li>
     <li>Ambil <b>⚡</b> untuk kecepatan ekstra</li>
-    <li>Ambil <b>🕷️</b> untuk memperlambat monster</li>
+    <li>Ambil <b>⬇️</b> untuk memperlambat monster</li>
     <li><b>Health:</b> Kamu punya 3 nyawa. Tabrak rintangan = -1 nyawa</li>
     <li><b>Game Over:</b> Jika nyawa habis atau tertangkap monster</li>
   </ul>
@@ -127,7 +136,7 @@ let isDucking = false;
 let dinoBottom = 50;
 let velocity = 0;
 const gravity = 0.7;
-const jumpVelocity = 20; // lompatan lebih tinggi sekarang
+const jumpVelocity = 20;
 let groundSpeed = 6;
 let sprinting = false;
 let obstacles = [];
@@ -146,9 +155,13 @@ function updateScoreboard() {
 function createObstacle() {
   let lastType = obstacles.length ? obstacles[obstacles.length - 1].type : null;
 
+  // Obstacle jenis duck-required muncul random tapi jarang
+  let rand = Math.random();
   let type;
-  if (lastType === 'flying') {
-    type = 'ground'; 
+  if (rand < 0.15 && lastType !== 'duck-required') {
+    type = 'duck-required';
+  } else if (lastType === 'flying') {
+    type = 'ground';
   } else if (lastType === 'ground') {
     type = Math.random() < 0.25 ? 'flying' : 'ground';
   } else {
@@ -160,6 +173,10 @@ function createObstacle() {
   if (type === 'flying') {
     obs.classList.add('flying');
     obs.textContent = '🦇';
+  } else if (type === 'duck-required') {
+    obs.classList.add('duck-required');
+    obs.style.bottom = 'auto';
+    obs.textContent = '⬛';
   } else {
     obs.textContent = '🌵';
   }
@@ -173,7 +190,7 @@ function createPowerup() {
   const p = document.createElement('div');
   p.classList.add('powerup');
   const isSpeed = Math.random() < 0.5;
-  p.textContent = isSpeed ? '⚡' : '🕷️';
+  p.textContent = isSpeed ? '⚡' : '⬇️';
   let startX = game.clientWidth + 300 + Math.random() * 500;
   p.style.left = startX + 'px';
   p.style.bottom = '60px';
@@ -218,10 +235,15 @@ function gameLoop() {
 
     const near = obs.pos < 190 && obs.pos > 120;
     if (near && obs.type !== 'powerup') {
-      const hitLow = obs.type === 'ground' && dinoBottom <= 90;
-      // kelelawar bisa dihindari dengan menunduk atau lompat cukup tinggi
-      const hitHigh = obs.type === 'flying' && !(isDucking || dinoBottom > 90);
-      if (hitLow || hitHigh) {
+      let hit = false;
+      if (obs.type === 'ground') {
+        hit = dinoBottom <= 90;
+      } else if (obs.type === 'flying') {
+        hit = !(isDucking || dinoBottom > 90);
+      } else if (obs.type === 'duck-required') {
+        hit = !isDucking;
+      }
+      if (hit) {
         health--;
         obs.el.remove();
         obstacles.splice(idx, 1);
@@ -235,7 +257,7 @@ function gameLoop() {
       if (obs.effect === '⚡') {
         groundSpeed = Math.min(groundSpeed + 2, 14);
       }
-      if (obs.effect === '🕷️') {
+      if (obs.effect === '⬇️') {
         monsterSpeed = Math.max(monsterSpeed - 0.05, 0.05);
       }
       obs.el.remove();
