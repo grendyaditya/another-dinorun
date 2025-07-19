@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Dino Run Emoji</title>
+<title>Another Dinorun</title>
 <style>
   * {
     margin: 0; padding: 0; box-sizing: border-box;
@@ -81,8 +81,8 @@
     position: absolute;
     bottom: 40px;
     font-size: 40px;
-    right: 0;
     user-select: none;
+    pointer-events: none;
   }
   .obstacle.cactus {
     font-size: 45px;
@@ -95,10 +95,9 @@
 <div id="game">
   <div id="monster" class="entity">🦖</div>
   <div id="dino" class="entity">🦕</div>
+  <div id="ground"></div>
 </div>
 <div id="info">Space = Jump | Shift = Sprint | Enter = Restart</div>
-
-<div id="ground"></div>
 
 <script>
   const dino = document.getElementById('dino');
@@ -106,6 +105,8 @@
   const ground = document.getElementById('ground');
   const scoreboard = document.getElementById('scoreboard');
   const game = document.getElementById('game');
+
+  const gameWidth = game.clientWidth;
 
   let isJumping = false;
   let velocity = 0;
@@ -147,10 +148,11 @@
       obs.textContent = '🪨';
     }
 
-    obs.style.right = '-50px';
+    obs.style.left = gameWidth + 'px';
+    obs.style.bottom = '40px';
     game.appendChild(obs);
 
-    obstacles.push({el: obs, pos: game.clientWidth + 50});
+    obstacles.push({el: obs, pos: gameWidth});
   }
 
   function resetGame() {
@@ -188,10 +190,10 @@
       dino.style.bottom = dinoBottom + 'px';
     }
 
-    // Move obstacles
+    // Move obstacles (decrease left position)
     obstacles.forEach((obs, idx) => {
       obs.pos -= groundSpeed;
-      obs.el.style.right = obs.pos + 'px';
+      obs.el.style.left = obs.pos + 'px';
 
       // Collision check (simple horizontal overlap + vertical)
       if(
