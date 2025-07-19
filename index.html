@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Another DinoRun with Dino Sprites</title>
+<title>Another DinoRun - Fair & Clear</title>
 <style>
   * {
     margin: 0; padding: 0; box-sizing: border-box;
@@ -45,7 +45,7 @@
     left: 50px;
     width: 50px;
     height: 50px;
-    background: url('https://i.ibb.co/3vDNnRw/dino-runner.png') no-repeat center / contain;
+    background: url('https://i.imgur.com/jIKY3kH.png') no-repeat center / contain;
     transition: bottom 0.2s ease, height 0.2s ease;
     z-index: 10;
   }
@@ -56,10 +56,10 @@
   #monster {
     position: absolute;
     bottom: 40px;
-    left: -80px;
+    left: -100px;
     width: 80px;
     height: 80px;
-    background: url('https://i.ibb.co/CBKb3Hj/dino-monster-head.png') no-repeat center / contain;
+    background: url('https://i.imgur.com/UHlOc9t.png') no-repeat center / contain;
     z-index: 8;
     transition: left 0.1s linear;
   }
@@ -68,14 +68,14 @@
     bottom: 40px;
     width: 30px;
     height: 50px;
-    background: url('https://i.ibb.co/Q6p0YyC/rock-obstacle.png') no-repeat center / contain;
+    background: url('https://i.imgur.com/fnC3WKn.png') no-repeat center / contain;
     border-radius: 5px;
     animation-timing-function: linear;
     z-index: 9;
   }
   .ball {
     border-radius: 50%;
-    background: url('https://i.ibb.co/bQzTXCF/ball-obstacle.png') no-repeat center / contain;
+    background: url('https://i.imgur.com/7bjX8dm.png') no-repeat center / contain;
     width: 40px !important;
     height: 40px !important;
   }
@@ -128,8 +128,11 @@
   let startTime = Date.now();
 
   let obstacleSpeed = 6;
-  let monsterPos = -80;
+  let monsterPos = -100; // start far left
   let monsterSpeed = 3;
+
+  // minimal safe distance so monster tidak langsung tangkap
+  const monsterSafeDistance = 150;
 
   if(localStorage.getItem('dinoHighScore')) {
     highScore = parseInt(localStorage.getItem('dinoHighScore'));
@@ -198,11 +201,14 @@
       player.style.bottom = '40px';
     }
 
-    monsterPos += monsterSpeed;
-    if (monsterPos > 40) monsterPos = 40;
+    // Monster mendekat tapi jangan terlalu dekat ke player (safe distance)
+    if(monsterPos + monsterSpeed < 40) {
+      monsterPos += monsterSpeed;
+    }
     monster.style.left = monsterPos + 'px';
 
-    if (monsterPos + 80 > 50 && playerBottom < 50) {
+    // Collision monster vs player hanya kalau monster sudah sangat dekat dan player di tanah
+    if (monsterPos + 80 > 50 + monsterSafeDistance && playerBottom < 50) {
       gameOver = true;
       if(score > highScore) {
         highScore = score;
@@ -260,7 +266,8 @@
   function obstacleSpawner() {
     if (gameOver) return;
     createObstacle();
-    let nextTime = Math.random() * 1300 + 1200;
+    // buat jarak spawn obstacle minimal 1.5 detik, maksimal 3 detik
+    let nextTime = Math.random() * 1500 + 1500;
     setTimeout(obstacleSpawner, nextTime);
   }
 
