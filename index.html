@@ -65,11 +65,25 @@
     bottom: 50px;
   }
   .flying {
-    bottom: 100px;
+    bottom: 80px; /* turunkan agar terlihat harus menunduk */
+    font-size: 35px; /* kecilkan kelelawar */
   }
   #info {
     margin: 8px;
     color: #444;
+  }
+  #instructions {
+    max-width: 1000px;
+    margin-top: 16px;
+    font-size: 16px;
+    color: #222;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #f9f9f9;
+  }
+  #instructions h3 {
+    margin-top: 0;
   }
 </style>
 </head>
@@ -81,7 +95,25 @@
   <div id="dino" class="entity">🦕</div>
   <div id="ground"></div>
 </div>
+
 <div id="info">Space = Jump | Shift = Sprint | ArrowDown = Duck | Enter = Restart</div>
+
+<div id="instructions">
+  <h3>Petunjuk Permainan</h3>
+  <ul>
+    <li><b>🦕 Dino</b> kamu harus bertahan selama mungkin dari kejaran monster 🦖.</li>
+    <li><b>Space</b> = Melompat</li>
+    <li><b>Shift</b> = Sprint / Lari cepat (menjauh dari monster)</li>
+    <li><b>↓ (Arrow Down)</b> = Menunduk (untuk menghindari kelelawar 🦇)</li>
+    <li><b>Enter</b> = Mulai ulang jika game over</li>
+    <li>Hindari rintangan: <b>🌵 kaktus</b>, <b>🦇 kelelawar</b> (harus menunduk)</li>
+    <li>Ambil <b>⚡</b> untuk kecepatan ekstra</li>
+    <li>Ambil <b>🕷️</b> untuk memperlambat monster</li>
+    <li><b>Health:</b> Kamu punya 3 nyawa. Tabrak rintangan = -1 nyawa</li>
+    <li><b>Game Over:</b> Jika nyawa habis atau tertangkap monster</li>
+  </ul>
+  <p><i>Tips:</i> Sprint bisa menjauh dari monster, tapi hati-hati terhadap rintangan!</p>
+</div>
 
 <script>
 const dino = document.getElementById('dino');
@@ -89,7 +121,6 @@ const monster = document.getElementById('monster');
 const ground = document.getElementById('ground');
 const scoreboard = document.getElementById('scoreboard');
 const game = document.getElementById('game');
-const info = document.getElementById('info');
 
 let isJumping = false;
 let isDucking = false;
@@ -113,19 +144,27 @@ function updateScoreboard() {
 }
 
 function createObstacle() {
+  // Pastikan tidak menumpuk kelelawar dan kaktus
+  // Cek apakah obstacle terakhir flying atau ground, agar tidak berurutan sama jenis
+  let lastType = obstacles.length ? obstacles[obstacles.length - 1].type : null;
+
+  let type;
+  if (lastType === 'flying') {
+    type = 'ground'; // Jika sebelumnya flying, sekarang ground
+  } else if (lastType === 'ground') {
+    // Bisa flying atau ground, tapi lebih jarang flying
+    type = Math.random() < 0.25 ? 'flying' : 'ground';
+  } else {
+    type = Math.random() < 0.25 ? 'flying' : 'ground';
+  }
+
   const obs = document.createElement('div');
   obs.classList.add('obstacle');
-  const type = Math.random() < 0.3 ? 'flying' : 'ground';
-
-  // Jangan buat obstacle jika terlalu dekat dengan obstacle sebelumnya
-  const last = obstacles[obstacles.length - 1];
-  if (last && last.pos > game.clientWidth + 150) return;
-
   if (type === 'flying') {
     obs.classList.add('flying');
     obs.textContent = '🦇';
   } else {
-    obs.textContent = '🌵';
+    obs.textContent = Math.random() < 0.5 ? '🌵' : '🔥';
   }
   let startX = game.clientWidth + 300 + Math.random() * 500;
   obs.style.left = startX + 'px';
@@ -161,12 +200,12 @@ function resetGame() {
   monsterSpeed = 0.2;
   ground.style.animationDuration = '1.5s';
   updateScoreboard();
-  info.style.display = 'block';
 }
 
 function gameLoop() {
   if (gameOver) return;
 
+  // Lompat dan gravitasi
   if (isJumping) {
     velocity -= gravity;
     dinoBottom += velocity;
@@ -177,6 +216,7 @@ function gameLoop() {
     dino.style.bottom = dinoBottom + 'px';
   }
 
+  // Update rintangan dan powerup
   obstacles.forEach((obs, idx) => {
     obs.pos -= groundSpeed;
     obs.el.style.left = obs.pos + 'px';
@@ -192,13 +232,16 @@ function gameLoop() {
         updateScoreboard();
         if (health <= 0) {
           gameOver = true;
-          info.style.display = 'block';
           scoreboard.textContent = `Game Over! Score: ${score} | High Score: ${highScore}`;
         }
       }
     } else if (near && obs.type === 'powerup') {
-      if (obs.effect === '⚡') groundSpeed += 2;
-      if (obs.effect === '🕷️') monsterSpeed -= 0.05;
+      if (obs.effect === '⚡') {
+        groundSpeed = Math.min(groundSpeed + 2, 14); // maksimal speed 14
+      }
+      if (obs.effect === '🕷️') {
+        monsterSpeed = Math.max(monsterSpeed - 0.05, 0.05); // minimal speed 0.05
+      }
       obs.el.remove();
       obstacles.splice(idx, 1);
     }
@@ -214,6 +257,7 @@ function gameLoop() {
     }
   });
 
+  // Gerak monster mengejar pelan, tapi semakin dekat jika tidak sprint
   if (!sprinting) {
     if (monsterLeft < 120) monsterLeft += monsterSpeed;
   } else {
@@ -222,9 +266,9 @@ function gameLoop() {
   }
   monster.style.left = monsterLeft + 'px';
 
+  // Jika monster terlalu dekat -> game over
   if (monsterLeft + 120 > 150) {
     gameOver = true;
-    info.style.display = 'block';
     scoreboard.textContent = `Tertangkap Monster! Skor: ${score} | High Score: ${highScore}`;
     if (score > highScore) {
       localStorage.setItem('dinoEmojiScore', score);
@@ -233,7 +277,7 @@ function gameLoop() {
 
   obstacleTimer -= groundSpeed;
   if (obstacleTimer <= 0) {
-    Math.random() < 0.3 ? createPowerup() : createObstacle();
+    Math.random() < 0.25 ? createPowerup() : createObstacle();
     obstacleTimer = 300 + Math.random() * 300;
   }
 
@@ -249,8 +293,8 @@ document.addEventListener('keydown', e => {
   }
   if (e.code === 'ShiftLeft') {
     sprinting = true;
-    groundSpeed = 10;
-    ground.style.animationDuration = '0.8s';
+    groundSpeed = Math.min(groundSpeed + 4, 14);
+    ground.style.animationDuration = (1.5 / (groundSpeed / 6)) + 's';
   }
   if (e.code === 'ArrowDown') {
     isDucking = true;
