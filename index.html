@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Dino Run Emoji Improved</title>
+<title>Dino Run Emoji - Monster Mengejar</title>
 <style>
   * {
     margin: 0; padding: 0; box-sizing: border-box;
@@ -68,14 +68,30 @@
     pointer-events: none;
     transition: bottom 0.2s, left 0.1s;
     z-index: 2;
+    transform: scaleX(-1); /* hadap kanan */
   }
   #dino {
-    left: 100px; /* agak ke tengah kiri */
+    left: 100px;
+    font-size: 50px;
+    bottom: 40px;
   }
   #monster {
-    left: 20px; /* di kiri belakang */
-    font-size: 70px;
-    opacity: 0.5;
+    left: 0px;
+    font-size: 150px; /* besar banget, cuma kepala */
+    opacity: 0.6;
+    z-index: 0;
+    bottom: 40px;
+    overflow: hidden;
+    line-height: 0.8;
+  }
+  /* Bungkus monster supaya dipotong bagian bawah */
+  #monster-wrapper {
+    position: absolute;
+    bottom: 40px;
+    left: 0;
+    width: 100px; /* hanya kepala monster yang kelihatan */
+    height: 100px; /* potong ke bawah */
+    overflow: hidden;
     z-index: 0;
   }
   .obstacle {
@@ -92,7 +108,9 @@
 
 <div id="scoreboard">Score: 0 | High Score: 0</div>
 <div id="game">
-  <div id="monster" class="entity">🦖</div>
+  <div id="monster-wrapper">
+    <div id="monster" class="entity">🦖</div>
+  </div>
   <div id="dino" class="entity">🦕</div>
   <div id="ground"></div>
 </div>
@@ -100,6 +118,7 @@
 
 <script>
   const dino = document.getElementById('dino');
+  const monsterWrapper = document.getElementById('monster-wrapper');
   const monster = document.getElementById('monster');
   const ground = document.getElementById('ground');
   const scoreboard = document.getElementById('scoreboard');
@@ -109,7 +128,7 @@
 
   let isJumping = false;
   let velocity = 0;
-  let dinoBottom = 40; // emoji bottom in px (on ground)
+  let dinoBottom = 40;
   const gravity = 0.7;
   const jumpVelocity = 14;
 
@@ -119,14 +138,14 @@
   let obstacles = [];
   let obstacleSpawnTimer = 0;
 
-  let monsterLeft = 20; // posisi monster tetap
+  // Monster mulai jauh di kiri
+  let monsterLeft = -90; // di luar layar kiri
 
   let score = 0;
   let highScore = 0;
 
   let gameOver = false;
 
-  // Load high score from localStorage
   if(localStorage.getItem('dinoRunEmojiHighScore')) {
     highScore = parseInt(localStorage.getItem('dinoRunEmojiHighScore'));
   }
@@ -138,10 +157,8 @@
   function createObstacle() {
     const obs = document.createElement('div');
     obs.classList.add('obstacle');
-    obs.textContent = '🌵'; // cuma kaktus
+    obs.textContent = '🌵';
 
-    // Jarak spawn acak dan lebih jauh supaya nyaman
-    // mulai dari kanan + random offset antara 200-400 px
     const spawnPos = gameWidth + 200 + Math.random() * 200;
     obs.style.left = spawnPos + 'px';
     obs.style.bottom = '40px';
@@ -161,8 +178,8 @@
     dinoBottom = 40;
     dino.style.bottom = dinoBottom + 'px';
 
-    monsterLeft = 20;
-    monster.style.left = monsterLeft + 'px';
+    monsterLeft = -90; // mulai jauh dari kiri luar layar
+    monsterWrapper.style.left = monsterLeft + 'px';
 
     ground.style.animationDuration = '1.5s';
 
@@ -185,18 +202,17 @@
       dino.style.bottom = dinoBottom + 'px';
     }
 
-    // Move obstacles leftward
+    // Move obstacles left
     obstacles.forEach((obs, idx) => {
       obs.pos -= groundSpeed;
       obs.el.style.left = obs.pos + 'px';
 
-      // Collision detection
+      // Collision check dino dan obstacle
       if (
-        obs.pos < 150 && obs.pos > 100 && // sesuaikan posisi dino
+        obs.pos < 150 && obs.pos > 100 &&
         dinoBottom < 70
       ) {
         gameOver = true;
-
         if(score > highScore) {
           highScore = score;
           localStorage.setItem('dinoRunEmojiHighScore', highScore);
@@ -204,7 +220,6 @@
         scoreboard.textContent = `Game Over! Final Score: ${score} | High Score: ${highScore}`;
       }
 
-      // Remove obstacles offscreen and add score
       if(obs.pos < -60) {
         obs.el.remove();
         obstacles.splice(idx, 1);
@@ -215,19 +230,28 @@
       }
     });
 
-    // Monster selalu mengikuti posisi dino, agak jauh di kiri
-    let targetLeft = 20; // tetap
-    if(monsterLeft < targetLeft) {
-      monsterLeft += 0.3;
-    } else if(monsterLeft > targetLeft) {
-      monsterLeft -= 0.3;
+    // Monster mendekat secara gradual ke posisi dino
+    // target monster kira2 60px (dekat tapi tidak menempel)
+    if(monsterLeft < 60) {
+      // Kecepatan monster semakin besar seiring score bertambah (maks 1.5 px/frame)
+      let speed = Math.min(0.5 + score * 0.02, 1.5);
+      monsterLeft += speed;
     }
-    monster.style.left = monsterLeft + 'px';
+    monsterWrapper.style.left = monsterLeft + 'px';
+
+    // Collision monster dengan dino - jika terlalu dekat game over
+    if(monsterLeft + 80 > 100) { // 80 = lebar monster wrapper kira2
+      gameOver = true;
+      if(score > highScore) {
+        highScore = score;
+        localStorage.setItem('dinoRunEmojiHighScore', highScore);
+      }
+      scoreboard.textContent = `Game Over! Monster caught you! Final Score: ${score} | High Score: ${highScore}`;
+    }
 
     obstacleSpawnTimer -= groundSpeed;
     if(obstacleSpawnTimer <= 0) {
       createObstacle();
-      // Jarak spawn berikutnya acak, 250 - 400 px
       obstacleSpawnTimer = 250 + Math.random() * 150;
     }
 
@@ -243,13 +267,11 @@
         velocity = jumpVelocity;
       }
     }
-
     if(e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
       sprinting = true;
       groundSpeed = 12;
       ground.style.animationDuration = '0.75s';
     }
-
     if(e.code === 'Enter' && gameOver) {
       resetGame();
       gameLoop();
@@ -264,7 +286,6 @@
     }
   });
 
-  // Init game
   resetGame();
   gameLoop();
 </script>
