@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Another DinoRun Enhanced</title>
+<title>Another DinoRun with Dino Sprites</title>
 <style>
-  /* Reset */
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
+  * {
+    margin: 0; padding: 0; box-sizing: border-box;
+  }
   body {
     background: linear-gradient(to top, #87ceeb 0%, #ccefff 100%);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -15,7 +15,6 @@
     user-select: none;
     height: 100vh;
   }
-
   #game {
     position: relative;
     width: 100vw;
@@ -27,7 +26,6 @@
     overflow: hidden;
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
   }
-
   #ground {
     position: absolute;
     bottom: 0;
@@ -37,57 +35,50 @@
     background-size: 80px 40px;
     animation: groundMove 1.5s linear infinite;
   }
-
   @keyframes groundMove {
     0% { background-position: 0 0; }
     100% { background-position: -80px 0; }
   }
-
   #player {
     position: absolute;
     bottom: 40px;
     left: 50px;
     width: 50px;
     height: 50px;
-    background: url('https://i.ibb.co/5vB4RgY/dino-runner-sprite.png') no-repeat center / contain;
+    background: url('https://i.ibb.co/3vDNnRw/dino-runner.png') no-repeat center / contain;
     transition: bottom 0.2s ease, height 0.2s ease;
     z-index: 10;
   }
-
   #player.ducking {
     height: 25px;
     bottom: 40px;
   }
-
   #monster {
     position: absolute;
     bottom: 40px;
     left: -80px;
     width: 80px;
     height: 80px;
-    background: url('https://i.ibb.co/M7p3X4G/dino-monster.png') no-repeat center / contain;
+    background: url('https://i.ibb.co/CBKb3Hj/dino-monster-head.png') no-repeat center / contain;
     z-index: 8;
     transition: left 0.1s linear;
   }
-
   .obstacle {
     position: absolute;
     bottom: 40px;
     width: 30px;
     height: 50px;
-    background: url('https://i.ibb.co/5mjgrks/rock.png') no-repeat center / contain;
+    background: url('https://i.ibb.co/Q6p0YyC/rock-obstacle.png') no-repeat center / contain;
     border-radius: 5px;
     animation-timing-function: linear;
     z-index: 9;
   }
-
   .ball {
     border-radius: 50%;
-    background: url('https://i.ibb.co/sVvCQrr/ball.png') no-repeat center / contain;
+    background: url('https://i.ibb.co/bQzTXCF/ball-obstacle.png') no-repeat center / contain;
     width: 40px !important;
     height: 40px !important;
   }
-
   #scoreboard {
     max-width: 700px;
     margin: 0 auto;
@@ -97,7 +88,6 @@
     color: #333;
     user-select: none;
   }
-
   #info {
     max-width: 700px;
     margin: 5px auto 20px auto;
@@ -141,7 +131,6 @@
   let monsterPos = -80;
   let monsterSpeed = 3;
 
-  // Load high score from localStorage
   if(localStorage.getItem('dinoHighScore')) {
     highScore = parseInt(localStorage.getItem('dinoHighScore'));
   }
@@ -197,7 +186,6 @@
       return;
     }
 
-    // Player position update
     if (jumping) {
       velocity -= gravity;
       playerBottom += velocity;
@@ -210,12 +198,10 @@
       player.style.bottom = '40px';
     }
 
-    // Monster moves closer
     monsterPos += monsterSpeed;
     if (monsterPos > 40) monsterPos = 40;
     monster.style.left = monsterPos + 'px';
 
-    // Collision monster vs player
     if (monsterPos + 80 > 50 && playerBottom < 50) {
       gameOver = true;
       if(score > highScore) {
@@ -226,13 +212,11 @@
       return;
     }
 
-    // Move obstacles
     for (let i = obstacles.length -1; i >=0; i--) {
       const obs = obstacles[i];
       obs.pos -= obstacleSpeed;
       obs.el.style.right = obs.pos + 'px';
 
-      // Collision detection
       if (
         obs.pos < 80 && obs.pos > 50 &&
         (
@@ -241,7 +225,6 @@
         )
       ) {
         if (obs.isBall) {
-          // Bounce and flip animation
           player.style.transition = 'bottom 0.5s ease, transform 0.5s ease';
           player.style.bottom = '150px';
           player.style.transform = 'rotate(180deg)';
@@ -263,7 +246,6 @@
         }
       }
 
-      // Remove obstacles off screen
       if (obs.pos < -50) {
         obs.el.remove();
         obstacles.splice(i, 1);
