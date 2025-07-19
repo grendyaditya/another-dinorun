@@ -1,232 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dino Run Enhanced</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: sans-serif;
-      background-color: #f4f4f4;
-      overflow: hidden;
-    }
-    #game {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      background: linear-gradient(to top, #eee, #cfcfcf);
-      overflow: hidden;
-    }
-    .dino, .monster, .obstacle, .powerup {
-      position: absolute;
-      font-size: 32px;
-      line-height: 1;
-    }
-    .dino {
-      left: 50px;
-      bottom: 90px;
-      transition: bottom 0.1s;
-    }
-    .monster {
-      left: 10px;
-      bottom: 90px;
-      font-size: 40px;
-    }
-    .obstacle, .powerup {
-      bottom: 90px;
-    }
-    .bat {
-      bottom: 150px;
-      font-size: 24px;
-    }
-    .falling-block {
-      top: 0;
-      height: 60px;
-      width: 10px;
-      background-color: black;
-      position: absolute;
-    }
-    #ground {
-      position: absolute;
-      bottom: 0;
-      width: 100%;
-      height: 80px;
-      background-color: #888;
-    }
-    #instructions {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      background: rgba(255, 255, 255, 0.8);
-      padding: 10px;
-      border-radius: 5px;
-      font-size: 14px;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dino Run with Stamina</title>
+<style>
+  body {
+    margin: 0;
+    background: #fff;
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #scoreboard {
+    font-size: 20px;
+    margin: 10px;
+  }
+  #game {
+    position: relative;
+    width: 1000px;
+    height: 300px;
+    background: #fff;
+    border: 4px solid #333;
+    overflow: hidden;
+    border-radius: 12px;
+  }
+  #ground {
+    position: absolute;
+    bottom: 0;
+    height: 50px;
+    width: 200%;
+    background: repeating-linear-gradient(to right, #999 0px, #999 10px, #777 10px, #777 20px);
+    animation: groundMove linear infinite;
+    animation-duration: 1.5s;
+    z-index: 1;
+  }
+  @keyframes groundMove {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .entity {
+    position: absolute;
+    bottom: 50px;
+    font-size: 60px;
+    transform: scaleX(-1);
+    z-index: 2;
+  }
+  #dino {
+    left: 150px;
+  }
+  #monster {
+    left: -200px;
+    font-size: 180px;
+    filter: brightness(0);
+    z-index: 0;
+    bottom: 40px; /* Lebih menapak tanah */
+  }
+  .obstacle, .powerup {
+    position: absolute;
+    font-size: 50px;
+    z-index: 3;
+  }
+  .obstacle {
+    bottom: 50px;
+  }
+  .flying {
+    bottom: 80px;
+    font-size: 35px;
+  }
+  .duck-required {
+    position: absolute;
+    top: 0;
+    width: 20px;
+    height: 180px;
+    background-color: black;
+    left: 0;
+  }
+  .powerup.jump {
+    bottom: 130px;
+    font-size: 50px;
+  }
+  .powerup.ground {
+    bottom: 60px;
+    font-size: 50px;
+  }
+</style>
 </head>
 <body>
-  <div id="game">
-    <div class="dino" id="dino">🦖</div>
-    <div class="monster" id="monster">🖤🦖</div>
-    <div id="ground"></div>
-    <div id="instructions">
-      <strong>Petunjuk:</strong><br>
-      ↑ : Lompat<br>
-      ↓ : Menunduk<br>
-      Shift : Sprint (gunakan stamina)<br>
-      ⚡ : Isi stamina<br>
-      ❤️ : Tambah darah<br>
-      ⬇️ : Monster melambat sementara<br>
-      Hindari 🌵 & 🦇 & balok hitam dari atas!
-    </div>
-  </div>
-
-  <script>
-    const game = document.getElementById("game");
-    const dino = document.getElementById("dino");
-    const monster = document.getElementById("monster");
-    let dinoBottom = 90;
-    let gravity = 2;
-    let isJumping = false;
-    let isDucking = false;
-    let health = 3;
-    let stamina = 100;
-    let monsterSpeed = 0.5;
-
-    document.addEventListener("keydown", function(e) {
-      if (e.key === "ArrowUp" && !isJumping) jump();
-      if (e.key === "ArrowDown") duck();
-      if (e.key === "Shift" && stamina > 0) sprint = true;
-    });
-
-    document.addEventListener("keyup", function(e) {
-      if (e.key === "ArrowDown") stand();
-      if (e.key === "Shift") sprint = false;
-    });
-
-    function jump() {
-      isJumping = true;
-      let upInterval = setInterval(() => {
-        if (dinoBottom >= 200) {
-          clearInterval(upInterval);
-          let downInterval = setInterval(() => {
-            if (dinoBottom <= 90) {
-              clearInterval(downInterval);
-              isJumping = false;
-              dinoBottom = 90;
-              dino.style.bottom = dinoBottom + "px";
-            } else {
-              dinoBottom -= gravity;
-              dino.style.bottom = dinoBottom + "px";
-            }
-          }, 20);
-        } else {
-          dinoBottom += gravity;
-          dino.style.bottom = dinoBottom + "px";
-        }
-      }, 20);
-    }
-
-    function duck() {
-      isDucking = true;
-      dino.style.transform = "scaleY(0.5)";
-      dino.style.bottom = "70px";
-    }
-
-    function stand() {
-      isDucking = false;
-      dino.style.transform = "scaleY(1)";
-      dino.style.bottom = dinoBottom + "px";
-    }
-
-    function createObstacle() {
-      let obstacleType = Math.random();
-      const obs = document.createElement("div");
-      if (obstacleType < 0.4) {
-        obs.classList.add("obstacle");
-        obs.innerText = "🌵";
-      } else if (obstacleType < 0.7) {
-        obs.classList.add("obstacle", "bat");
-        obs.innerText = "🦇";
-      } else {
-        obs.classList.add("falling-block");
-        obs.style.left = "100vw";
-        game.appendChild(obs);
-        moveObstacle(obs, true);
-        return;
-      }
-      obs.style.left = "100vw";
-      game.appendChild(obs);
-      moveObstacle(obs);
-    }
-
-    function moveObstacle(obstacle, isBlock = false) {
-      let pos = window.innerWidth;
-      const interval = setInterval(() => {
-        if (pos < -50) {
-          obstacle.remove();
-          clearInterval(interval);
-        } else {
-          pos -= 5;
-          obstacle.style.left = pos + "px";
-        }
-      }, 30);
-    }
-
-    function createPowerup() {
-      const types = ["⚡", "❤️", "⬇️"];
-      const emoji = types[Math.floor(Math.random() * types.length)];
-      const p = document.createElement("div");
-      p.classList.add("powerup");
-      p.innerText = emoji;
-      p.style.left = "100vw";
-      p.style.bottom = Math.random() > 0.5 ? "150px" : "90px";
-      game.appendChild(p);
-
-      let pos = window.innerWidth;
-      const interval = setInterval(() => {
-        if (pos < -50) {
-          p.remove();
-          clearInterval(interval);
-        } else {
-          pos -= 5;
-          p.style.left = pos + "px";
-
-          const dinoRect = dino.getBoundingClientRect();
-          const powerRect = p.getBoundingClientRect();
-          if (
-            dinoRect.left < powerRect.right &&
-            dinoRect.right > powerRect.left &&
-            dinoRect.top < powerRect.bottom &&
-            dinoRect.bottom > powerRect.top
-          ) {
-            if (emoji === "⚡" && dinoBottom > 90) stamina = 100;
-            if (emoji === "❤️") health = Math.min(health + 1, 3);
-            if (emoji === "⬇️") monsterSpeed = 0.2;
-            p.remove();
-            clearInterval(interval);
-            setTimeout(() => (monsterSpeed = 0.5), 3000);
-          }
-        }
-      }, 30);
-    }
-
-    let sprint = false;
-    setInterval(() => {
-      if (!sprint && stamina < 100) stamina += 1;
-      if (sprint && stamina > 0) stamina -= 2;
-    }, 100);
-
-    setInterval(createObstacle, 2000);
-    setInterval(createPowerup, 8000);
-    setInterval(() => {
-      const monsterLeft = parseFloat(monster.style.left);
-      monster.style.left = (monsterLeft + monsterSpeed * (sprint ? 2 : 1)) + "px";
-      const dinoLeft = dino.getBoundingClientRect().left;
-      const monsterRight = monster.getBoundingClientRect().right;
-      if (monsterRight >= dinoLeft) alert("Game Over! Tertangkap monster");
-    }, 50);
-  </script>
+<div id="scoreboard">Score: 0 | Health: 3 | Stamina: 100 | High Score: 0</div>
+<div id="game">
+  <div id="monster" class="entity">🦖</div>
+  <div id="dino" class="entity">🦕</div>
+  <div id="ground"></div>
+</div>
+<script>
+// Script lengkap akan disisipkan kembali di sini
+</script>
 </body>
 </html>
