@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Runner Game dengan Monster & Sprint</title>
+<style>
+  body {
+    margin: 0; background: #222; color: #eee; font-family: Arial, sans-serif;
+    overflow: hidden; user-select: none;
+  }
+  #game {
+    position: relative; width: 100vw; height: 150px; background: #444;
+    overflow: hidden; margin: 50px auto; max-width: 600px; border-radius: 8px;
+  }
+  #player {
+    position: absolute; bottom: 0; left: 20px; width: 40px; height: 40px;
+    background: #0f0; border-radius: 4px;
+    transition: height 0.2s ease;
+    z-index: 5;
+  }
+  #player.ducking {
+    height: 20px;
+  }
+  #monster {
+    position: absolute; bottom: 0; left: -50px; width: 60px; height: 60px;
+    background: #800000; border-radius: 8px;
+    z-index: 4;
+    transition: left 0.1s linear;
+  }
+  .obstacle {
+    position: absolute; bottom: 0; width: 20px; height: 40px;
+    background: #f00; border-radius: 2px;
+    animation-timing-function: linear;
+    z-index: 3;
+  }
+  .ball {
+    border-radius: 50%;
+    background: #00f;
+  }
+  #score {
+    text-align: center; font-size: 20px; margin-top: 10px;
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+
+<div id="game">
+  <div id="monster"></div>
+  <div id="player"></div>
+</div>
+<div id="score">Score: 0</div>
+
+<script>
+  const game = document.getElementById('game');
+  const player = document.getElementById('player');
+  const monster = document.getElementById('monster');
+  const scoreDisplay = document.getElementById('score');
+
+  let jumping = false;
+  let ducking = false;
+  let sprinting = false;
+  let playerBottom = 0;
+  let gravity = 0.6;
+  let velocity = 0;
+  let obstacles = [];
+  let score = 0;
+  let gameOver = false;
+  let startTime = Date.now();
+
+  let obstacleSpeed = 6;
+  let monsterPos = -50;
+  let monsterSpeed = 3;
+
+  function jump() {
+    if (!jumping && !ducking) {
+      jumping = true;
+      velocity = 12;
+    }
+  }
+
+  function duck(state) {
+    ducking = state;
+    if (ducking) {
+      player.classList.add('ducking');
+    } else {
+      player.classList.remove('ducking');
+    }
+  }
+
+  function createObstacle() {
+    const obstacle = document.createElement('div');
+    obstacle.classList.add('obstacle');
+    if (Math.random() < 0.2) {
+      obstacle.classList.add('ball');
+      obstacle.style.width = '30px';
+      obstacle.style.height = '30px';
+    } else {
+      obstacle.style.width = '20px';
+      obstacle.style.height = '40px';
+    }
+    obstacle.style.right = '0px';
+    game.appendChild(obstacle);
+    obstacles.push({el: obstacle, pos: game.clientWidth, isBall: obstacle.classList.contains('ball')});
+  }
+
+  function update() {
+    if (gameOver) return;
+
+    const elapsed = (Date.now() - startTime) / 1000;
+    if (elapsed >= 20) {
+      gameOver = true;
+      scoreDisplay.textContent = 'Waktu habis! Skor akhir: ' + score;
+      return;
+    }
+
+    // Update player position
+    if (jumping) {
+      velocity -= gravity;
+      playerBottom += velocity;
+      if (playerBottom <= 0) {
+        playerBottom = 0;
+        jumping = false;
+      }
+      player.style.bottom = playerBottom + 'px';
+    }
+
+    // Update monster position (monsternya maju terus)
+    monsterPos += monsterSpeed;
+    if (monsterPos > 10) monsterPos = 10; // monster gak bisa maju lebih dari 10px dari kiri
+    monster.style.left = monsterPos + 'px';
+
+    // Collision monster vs player (player ada di 20px dari kiri)
+    // Check horizontal overlap & vertical overlap
+    if (monsterPos + 60 > 20 && playerBottom < 50) {
+      gameOver = true;
+      scoreDisplay.textContent = 'Monster menang! Skor akhir: ' + score;
+      return;
+    }
+
+    // Move obstacles
+    for (let i = obstacles.length -1; i >=0; i--) {
+      const obs = obstacles[i];
+      obs.pos -= obstacleSpeed;
+      obs.el.style.right = obs.pos + 'px';
+
+      // Collision detection dengan rintangan
+      if (
+        obs.pos < 60 && obs.pos > 20 &&
+        (
+          (!obs.isBall && !ducking && playerBottom < 40) ||
+          (obs.isBall && playerBottom < 30)
+        )
+      ) {
+        if (obs.isBall) {
+          // Bola bikin terbalik (animasi naik)
+          player.style.transition = 'bottom 0.5s ease, transform 0.5s ease';
+          player.style.bottom = '150px';
+          player.style.transform = 'rotate(180deg)';
+          setTimeout(() => {
+            player.style.transform = 'rotate(0deg)';
+            player.style.bottom = '0px';
+          }, 1000);
+          obs.el.remove();
+          obstacles.splice(i, 1);
+          continue;
+        } else {
+          gameOver = true;
+          scoreDisplay.textContent = 'Game Over! Skor akhir: ' + score;
+          return;
+        }
+      }
+
+      if (obs.pos < -50) {
+        obs.el.remove();
+        obstacles.splice(i, 1);
+        score++;
+        scoreDisplay.textContent = 'Score: ' + score;
+      }
+    }
+
+    requestAnimationFrame(update);
+  }
+
+  function obstacleSpawner() {
+    if (gameOver) return;
+    createObstacle();
+    let nextTime = Math.random() * 1500 + 1000;
+    setTimeout(obstacleSpawner, nextTime);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      jump();
+    }
+    if (e.code === 'ArrowDown') {
+      e.preventDefault();
+      duck(true);
+    }
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+      sprinting = true;
+      obstacleSpeed = 12;
+      monsterSpeed = 6;
+    }
+    if (e.code === 'Enter' && gameOver) {
+      location.reload();
+    }
+  });
+
+  document.addEventListener('keyup', e => {
+    if (e.code === 'ArrowDown') {
+      e.preventDefault();
+      duck(false);
+    }
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+      sprinting = false;
+      obstacleSpeed = 6;
+      monsterSpeed = 3;
+    }
+  });
+
+  obstacleSpawner();
+  update();
+</script>
+
+</body>
+</html>
