@@ -65,17 +65,20 @@
     bottom: 50px;
   }
   .flying {
-    bottom: 80px; /* turunkan agar terlihat harus menunduk */
-    font-size: 35px; /* kecilkan kelelawar */
+    bottom: 80px; /* kelelawar lebih rendah, harus menunduk */
+    font-size: 35px; /* kecil */
   }
   .duck-required {
     top: 0;
     bottom: auto;
-    height: 150px;
-    font-size: 100px;
-    line-height: 130px;
+    height: 90px; /* lebih pendek */
+    width: 25px; /* lebih tipis */
+    font-size: 70px; /* sesuaikan ukuran font */
+    line-height: 70px;
     color: black;
     transform: scaleX(-1);
+    text-align: center;
+    user-select: none;
   }
   #info {
     margin: 8px;
@@ -136,7 +139,8 @@ let isDucking = false;
 let dinoBottom = 50;
 let velocity = 0;
 const gravity = 0.7;
-const jumpVelocity = 20;
+// Turunkan jump velocity supaya lompat tidak terlalu tinggi tapi cukup hindari kelelawar
+const jumpVelocity = 16;
 let groundSpeed = 6;
 let sprinting = false;
 let obstacles = [];
