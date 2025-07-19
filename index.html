@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Dino Run Emoji - Simple & Fun</title>
+<title>Dino Run Emoji Improved</title>
 <style>
   * {
     margin: 0; padding: 0; box-sizing: border-box;
@@ -66,14 +66,14 @@
     font-size: 50px;
     user-select: none;
     pointer-events: none;
-    transition: bottom 0.2s;
+    transition: bottom 0.2s, left 0.1s;
     z-index: 2;
   }
   #dino {
-    left: 50px;
+    left: 100px; /* agak ke tengah kiri */
   }
   #monster {
-    left: 10px;
+    left: 20px; /* di kiri belakang */
     font-size: 70px;
     opacity: 0.5;
     z-index: 0;
@@ -81,13 +81,10 @@
   .obstacle {
     position: absolute;
     bottom: 40px;
-    font-size: 45px;
+    font-size: 50px;
     user-select: none;
     pointer-events: none;
     z-index: 3;
-  }
-  .obstacle.cactus {
-    font-size: 50px;
   }
 </style>
 </head>
@@ -122,7 +119,7 @@
   let obstacles = [];
   let obstacleSpawnTimer = 0;
 
-  let monsterLeft = 10;
+  let monsterLeft = 20; // posisi monster tetap
 
   let score = 0;
   let highScore = 0;
@@ -141,20 +138,16 @@
   function createObstacle() {
     const obs = document.createElement('div');
     obs.classList.add('obstacle');
+    obs.textContent = '🌵'; // cuma kaktus
 
-    // Random obstacle: cactus 🌵 or rock 🪨
-    if(Math.random() < 0.5) {
-      obs.textContent = '🌵';
-      obs.classList.add('cactus');
-    } else {
-      obs.textContent = '🪨';
-    }
-
-    obs.style.left = gameWidth + 'px';
+    // Jarak spawn acak dan lebih jauh supaya nyaman
+    // mulai dari kanan + random offset antara 200-400 px
+    const spawnPos = gameWidth + 200 + Math.random() * 200;
+    obs.style.left = spawnPos + 'px';
     obs.style.bottom = '40px';
-    game.appendChild(obs);
 
-    obstacles.push({el: obs, pos: gameWidth});
+    game.appendChild(obs);
+    obstacles.push({el: obs, pos: spawnPos});
   }
 
   function resetGame() {
@@ -168,7 +161,7 @@
     dinoBottom = 40;
     dino.style.bottom = dinoBottom + 'px';
 
-    monsterLeft = 10;
+    monsterLeft = 20;
     monster.style.left = monsterLeft + 'px';
 
     ground.style.animationDuration = '1.5s';
@@ -197,9 +190,9 @@
       obs.pos -= groundSpeed;
       obs.el.style.left = obs.pos + 'px';
 
-      // Collision detection (simple box check)
+      // Collision detection
       if (
-        obs.pos < 100 && obs.pos > 40 &&
+        obs.pos < 150 && obs.pos > 100 && // sesuaikan posisi dino
         dinoBottom < 70
       ) {
         gameOver = true;
@@ -222,18 +215,21 @@
       }
     });
 
-    // Spawn obstacles every 1.5-2.5 sec randomly
+    // Monster selalu mengikuti posisi dino, agak jauh di kiri
+    let targetLeft = 20; // tetap
+    if(monsterLeft < targetLeft) {
+      monsterLeft += 0.3;
+    } else if(monsterLeft > targetLeft) {
+      monsterLeft -= 0.3;
+    }
+    monster.style.left = monsterLeft + 'px';
+
     obstacleSpawnTimer -= groundSpeed;
     if(obstacleSpawnTimer <= 0) {
       createObstacle();
-      obstacleSpawnTimer = 90 + Math.random() * 60;
+      // Jarak spawn berikutnya acak, 250 - 400 px
+      obstacleSpawnTimer = 250 + Math.random() * 150;
     }
-
-    // Monster slowly moves forward but stays near dino
-    if(monsterLeft < 40) {
-      monsterLeft += 0.4;
-    }
-    monster.style.left = monsterLeft + 'px';
 
     requestAnimationFrame(gameLoop);
   }
