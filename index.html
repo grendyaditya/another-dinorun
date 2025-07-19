@@ -122,14 +122,13 @@
   <h3>Petunjuk Permainan</h3>
   <ul>
     <li><b>🦕 Dino</b> kamu harus bertahan selama mungkin dari kejaran monster 🦖.</li>
-    <li><b>Space</b> = Melompat (untuk menghindari kaktus dan kelelawar serta powerup udara)</li>
+    <li><b>Space</b> = Melompat (untuk menghindari kaktus, kelelawar, balok hitam, dan mengambil powerup udara)</li>
     <li><b>Shift</b> = Sprint / Lari cepat (menjauh dari monster)</li>
     <li><b>↓ (Arrow Down)</b> = Menunduk (untuk menghindari kelelawar dan balok hitam panjang)</li>
     <li><b>Enter</b> = Mulai ulang jika game over</li>
     <li>Hindari rintangan: <b>🌵 kaktus</b>, <b>🦇 kelelawar</b>, dan <b>⬛ balok hitam</b> (wajib menunduk)</li>
-    <li>Ambil <b>⚡</b> (powerup tanah) untuk kecepatan ekstra</li>
-    <li>Ambil <b>⬇️</b> (powerup tanah) untuk memperlambat monster</li>
-    <li>Ambil <b>🐇</b> (powerup udara) untuk kecepatan ekstra, harus dilompat</li>
+    <li>Ambil powerup tanah: <b>⚡</b> (kecepatan ekstra), <b>⬇️</b> (perlambat monster), <b>❤️</b> (tambah darah)</li>
+    <li>Ambil powerup udara (harus dilompat): <b>⚡</b> (kecepatan ekstra)</li>
     <li><b>Health:</b> Kamu punya 3 nyawa. Tabrak rintangan = -1 nyawa</li>
     <li><b>Game Over:</b> Jika nyawa habis atau tertangkap monster</li>
   </ul>
@@ -148,7 +147,6 @@ let isDucking = false;
 let dinoBottom = 50;
 let velocity = 0;
 const gravity = 0.7;
-// Turunkan jump velocity supaya lompat cukup untuk kelelawar dan powerup udara
 const jumpVelocity = 16;
 let groundSpeed = 6;
 let sprinting = false;
@@ -168,7 +166,6 @@ function updateScoreboard() {
 function createObstacle() {
   let lastType = obstacles.length ? obstacles[obstacles.length - 1].type : null;
 
-  // Obstacle jenis duck-required muncul random tapi jarang
   let rand = Math.random();
   let type;
   if (rand < 0.12 && lastType !== 'duck-required') {
@@ -201,18 +198,21 @@ function createPowerup() {
   const p = document.createElement('div');
   p.classList.add('powerup');
   let effect;
-  // Chance kecil untuk powerup, dan bagi 3 jenis
   let r = Math.random();
-  if (r < 0.3) {
+  if (r < 0.2) {
     p.textContent = '⚡';
     p.classList.add('ground');
     effect = 'speed';
-  } else if (r < 0.55) {
+  } else if (r < 0.4) {
     p.textContent = '⬇️';
     p.classList.add('ground');
     effect = 'slowMonster';
+  } else if (r < 0.45) {
+    p.textContent = '❤️';
+    p.classList.add('ground');
+    effect = 'health';
   } else {
-    p.textContent = '🐇';
+    p.textContent = '⚡';
     p.classList.add('jump');
     effect = 'speedJump';
   }
@@ -291,6 +291,10 @@ function gameLoop() {
           velocity = jumpVelocity;
         }
       }
+      if (obs.effect === 'health') {
+        if (health < 3) health++;
+        updateScoreboard();
+      }
       obs.el.remove();
       obstacles.splice(idx, 1);
     }
@@ -324,7 +328,6 @@ function gameLoop() {
 
   obstacleTimer -= groundSpeed;
   if (obstacleTimer <= 0) {
-    // powerups sangat jarang (30% chance)
     if (Math.random() < 0.3) {
       createPowerup();
     } else {
