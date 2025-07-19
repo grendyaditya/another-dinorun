@@ -102,11 +102,11 @@
   <h3>Petunjuk Permainan</h3>
   <ul>
     <li><b>🦕 Dino</b> kamu harus bertahan selama mungkin dari kejaran monster 🦖.</li>
-    <li><b>Space</b> = Melompat</li>
+    <li><b>Space</b> = Melompat (untuk menghindari kaktus dan kelelawar)</li>
     <li><b>Shift</b> = Sprint / Lari cepat (menjauh dari monster)</li>
-    <li><b>↓ (Arrow Down)</b> = Menunduk (untuk menghindari kelelawar 🦇)</li>
+    <li><b>↓ (Arrow Down)</b> = Menunduk (untuk menghindari kelelawar juga)</li>
     <li><b>Enter</b> = Mulai ulang jika game over</li>
-    <li>Hindari rintangan: <b>🌵 kaktus</b>, <b>🦇 kelelawar</b> (harus menunduk)</li>
+    <li>Hindari rintangan: <b>🌵 kaktus</b>, <b>🦇 kelelawar</b> (bisa dilompati atau ditunduk)</li>
     <li>Ambil <b>⚡</b> untuk kecepatan ekstra</li>
     <li>Ambil <b>🕷️</b> untuk memperlambat monster</li>
     <li><b>Health:</b> Kamu punya 3 nyawa. Tabrak rintangan = -1 nyawa</li>
@@ -127,7 +127,7 @@ let isDucking = false;
 let dinoBottom = 50;
 let velocity = 0;
 const gravity = 0.7;
-const jumpVelocity = 14;
+const jumpVelocity = 20; // lompatan lebih tinggi sekarang
 let groundSpeed = 6;
 let sprinting = false;
 let obstacles = [];
@@ -144,12 +144,11 @@ function updateScoreboard() {
 }
 
 function createObstacle() {
-  // Pastikan tidak menumpuk kelelawar dan kaktus
   let lastType = obstacles.length ? obstacles[obstacles.length - 1].type : null;
 
   let type;
   if (lastType === 'flying') {
-    type = 'ground'; // Jika sebelumnya flying, sekarang ground
+    type = 'ground'; 
   } else if (lastType === 'ground') {
     type = Math.random() < 0.25 ? 'flying' : 'ground';
   } else {
@@ -220,7 +219,8 @@ function gameLoop() {
     const near = obs.pos < 190 && obs.pos > 120;
     if (near && obs.type !== 'powerup') {
       const hitLow = obs.type === 'ground' && dinoBottom <= 90;
-      const hitHigh = obs.type === 'flying' && !isDucking;
+      // kelelawar bisa dihindari dengan menunduk atau lompat cukup tinggi
+      const hitHigh = obs.type === 'flying' && !(isDucking || dinoBottom > 90);
       if (hitLow || hitHigh) {
         health--;
         obs.el.remove();
