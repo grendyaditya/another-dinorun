@@ -3,24 +3,23 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Simple Dino Run</title>
+<title>Dino Run Emoji</title>
 <style>
   * {
     margin: 0; padding: 0; box-sizing: border-box;
   }
   body {
-    background: #70c5ce;
+    background: #f7f7f7;
     font-family: Arial, sans-serif;
     user-select: none;
-    overflow: hidden;
-    height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
+    height: 100vh;
     justify-content: center;
   }
   #scoreboard {
-    font-size: 20px;
+    font-size: 24px;
     font-weight: bold;
     color: #333;
     margin-bottom: 10px;
@@ -28,234 +27,229 @@
   #info {
     font-size: 14px;
     color: #555;
-    margin-bottom: 15px;
+    margin: 10px 0;
   }
   #game {
     position: relative;
     width: 700px;
     height: 180px;
-    background: linear-gradient(to top, #87ceeb 0%, #ccefff 100%);
-    border-radius: 15px;
+    background: #fff;
+    border: 2px solid #666;
+    border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
   }
   #ground {
     position: absolute;
     bottom: 0;
-    width: 200%;
+    left: 0;
     height: 40px;
-    background: linear-gradient(90deg, #654321 0%, #7a4f25 50%, #654321 100%);
-    background-size: 80px 40px;
-    animation: groundMove 1.5s linear infinite;
+    width: 200%;
+    background: repeating-linear-gradient(
+      to right,
+      #999 0,
+      #999 5px,
+      #777 5px,
+      #777 10px
+    );
+    animation: groundMove linear infinite;
+    animation-duration: 1.5s;
+    z-index: 1;
   }
   @keyframes groundMove {
-    0% { background-position: 0 0; }
-    100% { background-position: -80px 0; }
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
   }
-  #player {
+  .entity {
     position: absolute;
     bottom: 40px;
-    left: 60px;
-    width: 50px;
-    height: 50px;
-    background: url('https://i.imgur.com/jIKY3kH.png') no-repeat center/contain;
-    transition: bottom 0.2s ease;
-    z-index: 10;
+    font-size: 50px;
+    user-select: none;
+    pointer-events: none;
+    transition: bottom 0.2s;
+    z-index: 2;
+  }
+  #dino {
+    left: 50px;
   }
   #monster {
-    position: absolute;
-    bottom: 40px;
     left: 10px;
-    width: 80px;
-    height: 80px;
-    background: url('https://i.imgur.com/UHlOc9t.png') no-repeat center/contain;
-    opacity: 0.6;
-    z-index: 9;
-    transition: left 0.2s ease;
+    font-size: 70px;
+    opacity: 0.5;
+    z-index: 0;
   }
   .obstacle {
     position: absolute;
     bottom: 40px;
-    width: 30px;
-    height: 50px;
-    background: url('https://i.imgur.com/fnC3WKn.png') no-repeat center/contain;
-    border-radius: 5px;
-    z-index: 9;
+    font-size: 40px;
+    right: 0;
+    user-select: none;
   }
-  .obstacle.ball {
-    border-radius: 50%;
-    width: 40px !important;
-    height: 40px !important;
+  .obstacle.cactus {
+    font-size: 45px;
   }
 </style>
 </head>
 <body>
 
 <div id="scoreboard">Score: 0 | High Score: 0</div>
-<div id="info">Controls: Space = Jump, ↓ = Duck, Shift = Sprint, Enter = Restart</div>
 <div id="game">
-  <div id="monster"></div>
-  <div id="player"></div>
-  <div id="ground"></div>
+  <div id="monster" class="entity">🦖</div>
+  <div id="dino" class="entity">🦕</div>
 </div>
+<div id="info">Space = Jump | Shift = Sprint | Enter = Restart</div>
+
+<div id="ground"></div>
 
 <script>
-  const game = document.getElementById('game');
-  const player = document.getElementById('player');
+  const dino = document.getElementById('dino');
   const monster = document.getElementById('monster');
+  const ground = document.getElementById('ground');
   const scoreboard = document.getElementById('scoreboard');
+  const game = document.getElementById('game');
 
-  let jumping = false;
-  let ducking = false;
-  let sprinting = false;
-  let playerBottom = 0;
-  const gravity = 0.7;
+  let isJumping = false;
   let velocity = 0;
+  let dinoBottom = 40; // emoji bottom position in px
+  const gravity = 0.7;
+  const jumpVelocity = 14;
+
+  let sprinting = false;
+  let groundSpeed = 6;
+
   let obstacles = [];
+  let obstacleSpawnTimer = 0;
+
+  let monsterLeft = 10;
+
   let score = 0;
   let highScore = 0;
+
   let gameOver = false;
 
-  // Player jump height & speed
-  const jumpPower = 15;
-
-  // Speeds (pixels per frame)
-  let obstacleSpeed = 6;
-  let monsterBaseLeft = 10;
-  let monsterLeft = monsterBaseLeft;
-  const monsterSpeed = 0.8;
-
-  // Obstacle spawn timing
-  let nextObstacleIn = 0;
-
-  if(localStorage.getItem('simpleDinoHighScore')) {
-    highScore = parseInt(localStorage.getItem('simpleDinoHighScore'));
-  }
-  updateScoreboard();
-
-  function jump() {
-    if (!jumping && !ducking) {
-      jumping = true;
-      velocity = jumpPower;
-    }
-  }
-
-  function duck(state) {
-    ducking = state;
-    if (ducking) {
-      player.style.height = '25px';
-      player.style.bottom = '40px';
-    } else {
-      player.style.height = '50px';
-      player.style.bottom = (playerBottom + 40) + 'px';
-    }
-  }
-
-  function createObstacle() {
-    const obstacle = document.createElement('div');
-    obstacle.classList.add('obstacle');
-    if (Math.random() < 0.3) {
-      obstacle.classList.add('ball');
-    }
-    obstacle.style.right = '-40px';
-    game.appendChild(obstacle);
-    obstacles.push({el: obstacle, pos: game.clientWidth, isBall: obstacle.classList.contains('ball')});
+  // Load high score from localStorage
+  if(localStorage.getItem('dinoRunEmojiHighScore')) {
+    highScore = parseInt(localStorage.getItem('dinoRunEmojiHighScore'));
   }
 
   function updateScoreboard() {
     scoreboard.textContent = `Score: ${score} | High Score: ${highScore}`;
   }
 
+  function createObstacle() {
+    const obs = document.createElement('div');
+    obs.classList.add('obstacle');
+
+    // 50% chance cactus (🌵), 50% rock (🪨)
+    if(Math.random() < 0.5) {
+      obs.textContent = '🌵';
+      obs.classList.add('cactus');
+    } else {
+      obs.textContent = '🪨';
+    }
+
+    obs.style.right = '-50px';
+    game.appendChild(obs);
+
+    obstacles.push({el: obs, pos: game.clientWidth + 50});
+  }
+
   function resetGame() {
     obstacles.forEach(o => o.el.remove());
     obstacles = [];
+
     score = 0;
     gameOver = false;
-    playerBottom = 0;
+    isJumping = false;
     velocity = 0;
-    monsterLeft = monsterBaseLeft;
-    player.style.bottom = '40px';
-    player.style.height = '50px';
+    dinoBottom = 40;
+    dino.style.bottom = dinoBottom + 'px';
+
+    monsterLeft = 10;
+    monster.style.left = monsterLeft + 'px';
+
+    ground.style.animationDuration = '1.5s';
+
     updateScoreboard();
   }
 
   function gameLoop() {
-    if (gameOver) return;
+    if(gameOver) return;
 
     // Jumping physics
-    if (jumping) {
+    if(isJumping) {
       velocity -= gravity;
-      playerBottom += velocity;
-      if (playerBottom <= 0) {
-        playerBottom = 0;
-        jumping = false;
+      dinoBottom += velocity;
+
+      if(dinoBottom <= 40) {
+        dinoBottom = 40;
+        isJumping = false;
       }
-      if(!ducking) {
-        player.style.bottom = playerBottom + 40 + 'px';
-      }
+
+      dino.style.bottom = dinoBottom + 'px';
     }
 
     // Move obstacles
-    obstacles.forEach((obs, i) => {
-      obs.pos -= obstacleSpeed;
+    obstacles.forEach((obs, idx) => {
+      obs.pos -= groundSpeed;
       obs.el.style.right = obs.pos + 'px';
 
-      // Collision detection with player (simple box check)
-      if (
-        obs.pos < 90 && obs.pos > 40 && // horizontal overlap range
-        (
-          (!obs.isBall && !ducking && playerBottom < 60) || // obstacle is rock and player not ducking and low
-          (obs.isBall && playerBottom < 40) // obstacle ball and player low on ground
-        )
+      // Collision check (simple horizontal overlap + vertical)
+      if(
+        obs.pos < 100 && obs.pos > 40 &&
+        dinoBottom < 70
       ) {
         gameOver = true;
+
         if(score > highScore) {
           highScore = score;
-          localStorage.setItem('simpleDinoHighScore', highScore);
+          localStorage.setItem('dinoRunEmojiHighScore', highScore);
         }
         scoreboard.textContent = `Game Over! Final Score: ${score} | High Score: ${highScore}`;
       }
 
-      // Remove obstacles out of view and increase score
-      if (obs.pos < -50) {
+      // Remove obstacle if offscreen & increase score
+      if(obs.pos < -60) {
         obs.el.remove();
-        obstacles.splice(i,1);
-        if (!gameOver) {
+        obstacles.splice(idx, 1);
+        if(!gameOver) {
           score++;
           updateScoreboard();
         }
       }
     });
 
-    // Spawn new obstacle randomly every ~1.5-3 sec
-    nextObstacleIn -= 16;
-    if(nextObstacleIn <= 0 && !gameOver) {
+    // Spawn obstacles every 1.5-2.5 seconds randomly
+    obstacleSpawnTimer -= groundSpeed;
+    if(obstacleSpawnTimer <= 0) {
       createObstacle();
-      nextObstacleIn = 1500 + Math.random() * 1500;
+      obstacleSpawnTimer = 90 + Math.random() * 60;
     }
 
-    // Move monster slowly towards player base position
-    if(monsterLeft < 50) {
-      monsterLeft += monsterSpeed;
+    // Monster slowly moves forward but stays near dino
+    if(monsterLeft < 40) {
+      monsterLeft += 0.4;
     }
     monster.style.left = monsterLeft + 'px';
 
     requestAnimationFrame(gameLoop);
   }
 
+  // Controls
   document.addEventListener('keydown', e => {
-    if(e.code === 'Space') {
+    if(e.code === 'Space' && !gameOver) {
       e.preventDefault();
-      jump();
+      if(!isJumping) {
+        isJumping = true;
+        velocity = jumpVelocity;
+      }
     }
-    if(e.code === 'ArrowDown') {
-      e.preventDefault();
-      duck(true);
-    }
+
     if(e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
       sprinting = true;
-      obstacleSpeed = 12;
+      groundSpeed = 12;
+      ground.style.animationDuration = '0.75s';
     }
+
     if(e.code === 'Enter' && gameOver) {
       resetGame();
       gameLoop();
@@ -263,17 +257,15 @@
   });
 
   document.addEventListener('keyup', e => {
-    if(e.code === 'ArrowDown') {
-      e.preventDefault();
-      duck(false);
-    }
     if(e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
       sprinting = false;
-      obstacleSpeed = 6;
+      groundSpeed = 6;
+      ground.style.animationDuration = '1.5s';
     }
   });
 
-  // Start game loop
+  // Init game
+  resetGame();
   gameLoop();
 </script>
 
