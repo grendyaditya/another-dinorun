@@ -1,191 +1,273 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dino Run Enhanced</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      font-family: sans-serif;
-      background: #fff;
-    }
-    canvas {
-      display: block;
-      background: #f0f0f0;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Another Dino Run</title>
+<style>
+  body {
+    margin: 0;
+    background: #fff;
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #scoreboard {
+    font-size: 20px;
+    margin: 10px;
+  }
+  #game {
+    position: relative;
+    width: 1000px;
+    height: 300px;
+    background: #fff;
+    border: 4px solid #333;
+    overflow: hidden;
+    border-radius: 12px;
+  }
+  #ground {
+    position: absolute;
+    bottom: 0;
+    height: 50px;
+    width: 200%;
+    background: repeating-linear-gradient(to right, #999 0px, #999 10px, #777 10px, #777 20px);
+    animation: groundMove linear infinite;
+    animation-duration: 1.5s;
+    z-index: 1;
+  }
+  @keyframes groundMove {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .entity {
+    position: absolute;
+    bottom: 50px;
+    font-size: 60px;
+    transform: scaleX(-1);
+    z-index: 2;
+  }
+  #dino {
+    left: 150px;
+  }
+  #monster {
+    left: -200px;
+    font-size: 180px;
+    filter: brightness(0);
+    z-index: 0;
+  }
+  .obstacle, .powerup {
+    position: absolute;
+    font-size: 50px;
+    z-index: 3;
+  }
+  .obstacle {
+    bottom: 50px;
+  }
+  .flying {
+    bottom: 110px;
+  }
+  #info {
+    margin: 8px;
+    color: #444;
+  }
+</style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="800" height="300"></canvas>
-  <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
 
-    const dino = {
-      x: 100,
-      y: 230,
-      width: 30,
-      height: 30,
-      vy: 0,
-      gravity: 1.2,
-      jumpPower: -15,
-      crouch: false,
-      sprint: false,
-      health: 3
-    };
+<div id="scoreboard">Score: 0 | Health: 3 | High Score: 0</div>
+<div id="game">
+  <div id="monster" class="entity">🦖</div>
+  <div id="dino" class="entity">🦕</div>
+  <div id="ground"></div>
+</div>
+<div id="info">Space = Jump | Shift = Sprint | ArrowDown = Duck | Enter = Restart</div>
 
-    const monster = {
-      x: 20,
-      y: 220,
-      width: 40,
-      height: 40,
-      speed: 0.4
-    };
+<script>
+const dino = document.getElementById('dino');
+const monster = document.getElementById('monster');
+const ground = document.getElementById('ground');
+const scoreboard = document.getElementById('scoreboard');
+const game = document.getElementById('game');
 
-    let obstacles = [];
-    let powerups = [];
-    let keys = {};
-    let frame = 0;
-    let speed = 6;
-    let gameOver = false;
+let isJumping = false;
+let isDucking = false;
+let dinoBottom = 50;
+let velocity = 0;
+const gravity = 0.7;
+const jumpVelocity = 14;
+let groundSpeed = 6;
+let sprinting = false;
+let obstacles = [];
+let obstacleTimer = 0;
+let monsterLeft = -200;
+let monsterSpeed = 0.2;
+let score = 0;
+let highScore = localStorage.getItem('dinoEmojiScore') || 0;
+let health = 3;
+let gameOver = false;
 
-    function drawText() {
-      ctx.fillStyle = 'black';
-      ctx.font = '16px Arial';
-      ctx.fillText('Health: ' + dino.health, 10, 20);
+function updateScoreboard() {
+  scoreboard.textContent = `Score: ${score} | Health: ${health} | High Score: ${highScore}`;
+}
+
+function createObstacle() {
+  const obs = document.createElement('div');
+  obs.classList.add('obstacle');
+  const type = Math.random() < 0.25 ? 'flying' : 'ground';
+  if (type === 'flying') {
+    obs.classList.add('flying');
+    obs.textContent = '🦇';
+  } else {
+    obs.textContent = Math.random() < 0.5 ? '🌵' : '🔥';
+  }
+  let startX = game.clientWidth + 300 + Math.random() * 500;
+  obs.style.left = startX + 'px';
+  game.appendChild(obs);
+  obstacles.push({ el: obs, pos: startX, type });
+}
+
+function createPowerup() {
+  const p = document.createElement('div');
+  p.classList.add('powerup');
+  const isSpeed = Math.random() < 0.5;
+  p.textContent = isSpeed ? '⚡' : '🕷️';
+  let startX = game.clientWidth + 300 + Math.random() * 500;
+  p.style.left = startX + 'px';
+  p.style.bottom = '60px';
+  game.appendChild(p);
+  obstacles.push({ el: p, pos: startX, type: 'powerup', effect: p.textContent });
+}
+
+function resetGame() {
+  obstacles.forEach(o => o.el.remove());
+  obstacles = [];
+  score = 0;
+  health = 3;
+  gameOver = false;
+  dinoBottom = 50;
+  velocity = 0;
+  isJumping = false;
+  monsterLeft = -200;
+  dino.style.bottom = dinoBottom + 'px';
+  monster.style.left = monsterLeft + 'px';
+  groundSpeed = 6;
+  monsterSpeed = 0.2;
+  ground.style.animationDuration = '1.5s';
+  updateScoreboard();
+}
+
+function gameLoop() {
+  if (gameOver) return;
+
+  if (isJumping) {
+    velocity -= gravity;
+    dinoBottom += velocity;
+    if (dinoBottom <= 50) {
+      dinoBottom = 50;
+      isJumping = false;
     }
+    dino.style.bottom = dinoBottom + 'px';
+  }
 
-    function drawDino() {
-      ctx.font = dino.crouch ? '28px Arial' : '30px Arial';
-      ctx.fillText('🦖', dino.x, dino.y);
-    }
+  obstacles.forEach((obs, idx) => {
+    obs.pos -= groundSpeed;
+    obs.el.style.left = obs.pos + 'px';
 
-    function drawMonster() {
-      ctx.font = '50px Arial';
-      ctx.fillText('🦖', monster.x, monster.y);
-    }
-
-    function drawObstacles() {
-      ctx.font = '28px Arial';
-      obstacles.forEach(obs => {
-        ctx.fillText(obs.type === 'low' ? '🌵' : '🦇', obs.x, obs.y);
-      });
-    }
-
-    function drawPowerups() {
-      ctx.font = '24px Arial';
-      powerups.forEach(p => ctx.fillText('🕷️', p.x, p.y));
-    }
-
-    function update() {
-      if (gameOver) return;
-
-      // Jump
-      if (keys['Space'] && dino.y === 230 && !dino.crouch) {
-        dino.vy = dino.jumpPower;
-      }
-
-      // Crouch
-      dino.crouch = keys['ArrowDown'];
-
-      // Sprint
-      dino.sprint = keys['Shift'];
-
-      dino.y += dino.vy;
-      if (dino.y < 150) dino.vy += dino.gravity;
-      else {
-        dino.vy = 0;
-        dino.y = 230;
-      }
-
-      if (dino.sprint) speed = 9;
-      else speed = 6;
-
-      monster.x += monster.speed;
-
-      if (monster.x + monster.width >= dino.x && monster.x <= dino.x + dino.width) {
-        gameOver = true;
-        alert('Game Over! You were caught!');
-      }
-
-      // Update obstacles
-      obstacles.forEach(obs => obs.x -= speed);
-      obstacles = obstacles.filter(obs => obs.x + 30 > 0);
-
-      obstacles.forEach(obs => {
-        if (
-          obs.x < dino.x + dino.width &&
-          obs.x + 20 > dino.x &&
-          obs.y < dino.y &&
-          obs.y > dino.y - 30
-        ) {
-          dino.health--;
-          obs.x = -100;
-          if (dino.health <= 0) {
-            gameOver = true;
-            alert('Game Over! You lost all health!');
-          }
+    const near = obs.pos < 190 && obs.pos > 120;
+    if (near && obs.type !== 'powerup') {
+      const hitLow = obs.type === 'ground' && dinoBottom <= 90;
+      const hitHigh = obs.type === 'flying' && !isDucking;
+      if (hitLow || hitHigh) {
+        health--;
+        obs.el.remove();
+        obstacles.splice(idx, 1);
+        updateScoreboard();
+        if (health <= 0) {
+          gameOver = true;
+          scoreboard.textContent = `Game Over! Score: ${score} | High Score: ${highScore}`;
         }
-      });
-
-      // Update powerups
-      powerups.forEach(p => p.x -= speed);
-      powerups = powerups.filter(p => p.x + 20 > 0);
-
-      powerups.forEach(p => {
-        if (
-          p.x < dino.x + dino.width &&
-          p.x + 20 > dino.x &&
-          p.y < dino.y &&
-          p.y > dino.y - 30
-        ) {
-          monster.speed = Math.max(0.2, monster.speed - 0.05);
-          p.x = -100;
-        }
-      });
-
-      // Spawn obstacle
-      if (frame % 120 === 0) {
-        const type = Math.random() > 0.5 ? 'low' : 'high';
-        obstacles.push({
-          x: canvas.width,
-          y: type === 'low' ? 230 : 180,
-          type
-        });
       }
+    } else if (near && obs.type === 'powerup') {
+      if (obs.effect === '⚡') groundSpeed += 2;
+      if (obs.effect === '🕷️') monsterSpeed -= 0.05;
+      obs.el.remove();
+      obstacles.splice(idx, 1);
+    }
 
-      // Spawn powerup
-      if (frame % 400 === 0) {
-        powerups.push({
-          x: canvas.width,
-          y: 230
-        });
+    if (obs.pos < -60) {
+      obs.el.remove();
+      obstacles.splice(idx, 1);
+      if (obs.type !== 'powerup') {
+        score++;
+        if (score % 5 === 0) monsterSpeed += 0.03;
+        updateScoreboard();
       }
-
-      frame++;
     }
+  });
 
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawText();
-      drawDino();
-      drawMonster();
-      drawObstacles();
-      drawPowerups();
+  if (!sprinting) {
+    if (monsterLeft < 120) monsterLeft += monsterSpeed;
+  } else {
+    monsterLeft -= 0.7;
+    if (monsterLeft < -200) monsterLeft = -200;
+  }
+  monster.style.left = monsterLeft + 'px';
+
+  if (monsterLeft + 120 > 150) {
+    gameOver = true;
+    scoreboard.textContent = `Tertangkap Monster! Skor: ${score} | High Score: ${highScore}`;
+    if (score > highScore) {
+      localStorage.setItem('dinoEmojiScore', score);
     }
+  }
 
-    function loop() {
-      update();
-      draw();
-      if (!gameOver) requestAnimationFrame(loop);
+  obstacleTimer -= groundSpeed;
+  if (obstacleTimer <= 0) {
+    Math.random() < 0.25 ? createPowerup() : createObstacle();
+    obstacleTimer = 300 + Math.random() * 300;
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !gameOver) {
+    if (!isJumping) {
+      isJumping = true;
+      velocity = jumpVelocity;
     }
+  }
+  if (e.code === 'ShiftLeft') {
+    sprinting = true;
+    groundSpeed = 10;
+    ground.style.animationDuration = '0.8s';
+  }
+  if (e.code === 'ArrowDown') {
+    isDucking = true;
+    dino.style.transform = 'scaleX(-1) scaleY(0.5) translateY(30px)';
+  }
+  if (e.code === 'Enter' && gameOver) {
+    resetGame();
+    gameLoop();
+  }
+});
 
-    document.addEventListener('keydown', e => keys[e.key] = true);
-    document.addEventListener('keyup', e => keys[e.key] = false);
+document.addEventListener('keyup', e => {
+  if (e.code === 'ShiftLeft') {
+    sprinting = false;
+    groundSpeed = 6;
+    ground.style.animationDuration = '1.5s';
+  }
+  if (e.code === 'ArrowDown') {
+    isDucking = false;
+    dino.style.transform = 'scaleX(-1)';
+  }
+});
 
-    loop();
-  </script>
+resetGame();
+gameLoop();
+</script>
+
 </body>
 </html>
