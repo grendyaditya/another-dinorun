@@ -3,54 +3,40 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Dino Run Emoji - Monster Mengejar</title>
+<title>Dino Run - Monster Emoji</title>
 <style>
-  * {
-    margin: 0; padding: 0; box-sizing: border-box;
-  }
   body {
-    background: #f0f0f0;
-    font-family: Arial, sans-serif;
-    user-select: none;
+    margin: 0;
+    background: #fefefe;
+    font-family: sans-serif;
     display: flex;
     flex-direction: column;
     align-items: center;
-    height: 100vh;
-    justify-content: center;
   }
   #scoreboard {
     font-size: 24px;
-    font-weight: bold;
-    color: #222;
-    margin-bottom: 10px;
-  }
-  #info {
-    font-size: 14px;
-    color: #555;
-    margin: 10px 0 15px 0;
+    margin: 10px;
   }
   #game {
     position: relative;
-    width: 700px;
-    height: 180px;
+    width: 1000px;
+    height: 300px;
     background: #fff;
-    border: 3px solid #444;
-    border-radius: 10px;
+    border: 4px solid #333;
     overflow: hidden;
-    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    border-radius: 12px;
   }
   #ground {
     position: absolute;
     bottom: 0;
-    left: 0;
-    height: 40px;
+    height: 50px;
     width: 200%;
     background: repeating-linear-gradient(
       to right,
-      #aaa 0,
-      #aaa 5px,
-      #888 5px,
-      #888 10px
+      #999 0px,
+      #999 10px,
+      #777 10px,
+      #777 20px
     );
     animation: groundMove linear infinite;
     animation-duration: 1.5s;
@@ -62,45 +48,29 @@
   }
   .entity {
     position: absolute;
-    bottom: 40px;
-    font-size: 50px;
-    user-select: none;
-    pointer-events: none;
-    transition: bottom 0.2s, left 0.1s;
-    z-index: 2;
+    bottom: 50px;
+    font-size: 60px;
     transform: scaleX(-1); /* hadap kanan */
+    z-index: 2;
   }
   #dino {
-    left: 100px;
-    font-size: 50px;
-    bottom: 40px;
+    left: 150px;
   }
   #monster {
-    left: 0px;
-    font-size: 150px; /* besar banget, cuma kepala */
-    opacity: 0.6;
-    z-index: 0;
-    bottom: 40px;
-    overflow: hidden;
-    line-height: 0.8;
-  }
-  /* Bungkus monster supaya dipotong bagian bawah */
-  #monster-wrapper {
-    position: absolute;
-    bottom: 40px;
-    left: 0;
-    width: 100px; /* hanya kepala monster yang kelihatan */
-    height: 100px; /* potong ke bawah */
-    overflow: hidden;
+    left: -200px;
+    font-size: 180px;
+    opacity: 0.8;
     z-index: 0;
   }
   .obstacle {
     position: absolute;
-    bottom: 40px;
-    font-size: 50px;
-    user-select: none;
-    pointer-events: none;
+    bottom: 50px;
+    font-size: 60px;
     z-index: 3;
+  }
+  #info {
+    margin: 8px;
+    color: #444;
   }
 </style>
 </head>
@@ -108,46 +78,37 @@
 
 <div id="scoreboard">Score: 0 | High Score: 0</div>
 <div id="game">
-  <div id="monster-wrapper">
-    <div id="monster" class="entity">🦖</div>
-  </div>
+  <div id="monster" class="entity">👹</div>
   <div id="dino" class="entity">🦕</div>
   <div id="ground"></div>
 </div>
-<div id="info">Space = Jump | Shift = Sprint | Enter = Restart</div>
+<div id="info">Press Space to Jump | Shift to Sprint | Enter to Restart</div>
 
 <script>
   const dino = document.getElementById('dino');
-  const monsterWrapper = document.getElementById('monster-wrapper');
   const monster = document.getElementById('monster');
   const ground = document.getElementById('ground');
   const scoreboard = document.getElementById('scoreboard');
   const game = document.getElementById('game');
 
-  const gameWidth = game.clientWidth;
-
   let isJumping = false;
+  let dinoBottom = 50;
   let velocity = 0;
-  let dinoBottom = 40;
   const gravity = 0.7;
   const jumpVelocity = 14;
-
-  let sprinting = false;
   let groundSpeed = 6;
+  let sprinting = false;
 
   let obstacles = [];
-  let obstacleSpawnTimer = 0;
+  let obstacleTimer = 0;
 
-  // Monster mulai jauh di kiri
-  let monsterLeft = -90; // di luar layar kiri
-
+  let monsterLeft = -180; // start jauh
   let score = 0;
   let highScore = 0;
-
   let gameOver = false;
 
-  if(localStorage.getItem('dinoRunEmojiHighScore')) {
-    highScore = parseInt(localStorage.getItem('dinoRunEmojiHighScore'));
+  if(localStorage.getItem('dinoEmojiScore')) {
+    highScore = parseInt(localStorage.getItem('dinoEmojiScore'));
   }
 
   function updateScoreboard() {
@@ -158,128 +119,114 @@
     const obs = document.createElement('div');
     obs.classList.add('obstacle');
     obs.textContent = '🌵';
-
-    const spawnPos = gameWidth + 200 + Math.random() * 200;
-    obs.style.left = spawnPos + 'px';
-    obs.style.bottom = '40px';
-
+    let startX = game.clientWidth + 100 + Math.random() * 300;
+    obs.style.left = startX + 'px';
     game.appendChild(obs);
-    obstacles.push({el: obs, pos: spawnPos});
+    obstacles.push({ el: obs, pos: startX });
   }
 
   function resetGame() {
     obstacles.forEach(o => o.el.remove());
     obstacles = [];
-
     score = 0;
     gameOver = false;
-    isJumping = false;
+    dinoBottom = 50;
     velocity = 0;
-    dinoBottom = 40;
+    isJumping = false;
+    monsterLeft = -180;
     dino.style.bottom = dinoBottom + 'px';
-
-    monsterLeft = -90; // mulai jauh dari kiri luar layar
-    monsterWrapper.style.left = monsterLeft + 'px';
-
+    monster.style.left = monsterLeft + 'px';
     ground.style.animationDuration = '1.5s';
-
+    groundSpeed = 6;
     updateScoreboard();
   }
 
   function gameLoop() {
-    if(gameOver) return;
+    if (gameOver) return;
 
-    // Jump physics
-    if(isJumping) {
+    // Jumping
+    if (isJumping) {
       velocity -= gravity;
       dinoBottom += velocity;
-
-      if(dinoBottom <= 40) {
-        dinoBottom = 40;
+      if (dinoBottom <= 50) {
+        dinoBottom = 50;
         isJumping = false;
       }
-
       dino.style.bottom = dinoBottom + 'px';
     }
 
-    // Move obstacles left
+    // Move obstacles
     obstacles.forEach((obs, idx) => {
       obs.pos -= groundSpeed;
       obs.el.style.left = obs.pos + 'px';
 
-      // Collision check dino dan obstacle
       if (
-        obs.pos < 150 && obs.pos > 100 &&
-        dinoBottom < 70
+        obs.pos < 180 && obs.pos > 140 &&
+        dinoBottom <= 90
       ) {
         gameOver = true;
-        if(score > highScore) {
+        if (score > highScore) {
           highScore = score;
-          localStorage.setItem('dinoRunEmojiHighScore', highScore);
+          localStorage.setItem('dinoEmojiScore', highScore);
         }
-        scoreboard.textContent = `Game Over! Final Score: ${score} | High Score: ${highScore}`;
+        scoreboard.textContent = `Game Over! Final: ${score} | High Score: ${highScore}`;
       }
 
-      if(obs.pos < -60) {
+      if (obs.pos < -60) {
         obs.el.remove();
         obstacles.splice(idx, 1);
-        if(!gameOver) {
-          score++;
-          updateScoreboard();
-        }
+        score++;
+        updateScoreboard();
       }
     });
 
-    // Monster mendekat secara gradual ke posisi dino
-    // target monster kira2 60px (dekat tapi tidak menempel)
-    if(monsterLeft < 60) {
-      // Kecepatan monster semakin besar seiring score bertambah (maks 1.5 px/frame)
-      let speed = Math.min(0.5 + score * 0.02, 1.5);
+    // Monster mendekat perlahan
+    if (monsterLeft < 120) {
+      let speed = Math.min(0.3 + score * 0.01, 0.9); // lebih lambat dari versi sebelumnya
       monsterLeft += speed;
+      monster.style.left = monsterLeft + 'px';
     }
-    monsterWrapper.style.left = monsterLeft + 'px';
 
-    // Collision monster dengan dino - jika terlalu dekat game over
-    if(monsterLeft + 80 > 100) { // 80 = lebar monster wrapper kira2
+    // Cek kalau monster sudah nyusul
+    if (monsterLeft + 120 > 150) {
       gameOver = true;
-      if(score > highScore) {
+      if (score > highScore) {
         highScore = score;
-        localStorage.setItem('dinoRunEmojiHighScore', highScore);
+        localStorage.setItem('dinoEmojiScore', highScore);
       }
-      scoreboard.textContent = `Game Over! Monster caught you! Final Score: ${score} | High Score: ${highScore}`;
+      scoreboard.textContent = `Game Over! Tertangkap monster! Final: ${score} | High Score: ${highScore}`;
     }
 
-    obstacleSpawnTimer -= groundSpeed;
-    if(obstacleSpawnTimer <= 0) {
+    // Buat obstacle baru
+    obstacleTimer -= groundSpeed;
+    if (obstacleTimer <= 0) {
       createObstacle();
-      obstacleSpawnTimer = 250 + Math.random() * 150;
+      obstacleTimer = 250 + Math.random() * 300;
     }
 
     requestAnimationFrame(gameLoop);
   }
 
-  // Controls
   document.addEventListener('keydown', e => {
-    if(e.code === 'Space' && !gameOver) {
-      e.preventDefault();
-      if(!isJumping) {
+    if (e.code === 'Space' && !gameOver) {
+      if (!isJumping) {
         isJumping = true;
         velocity = jumpVelocity;
       }
     }
-    if(e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+    if (e.code === 'ShiftLeft') {
       sprinting = true;
-      groundSpeed = 12;
-      ground.style.animationDuration = '0.75s';
+      groundSpeed = 10;
+      ground.style.animationDuration = '0.8s';
     }
-    if(e.code === 'Enter' && gameOver) {
+    if (e.code === 'Enter' && gameOver) {
       resetGame();
       gameLoop();
     }
   });
 
   document.addEventListener('keyup', e => {
-    if(e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+    if (e.code === 'ShiftLeft') {
       sprinting = false;
       groundSpeed = 6;
       ground.style.animationDuration = '1.5s';
