@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Dino Run with Stamina</title>
+<title>Another Dino Run</title>
 <style>
   body {
     margin: 0;
@@ -49,13 +49,14 @@
   }
   #dino {
     left: 150px;
+    
   }
   #monster {
     left: -200px;
     font-size: 180px;
     filter: brightness(0);
     z-index: 0;
-    bottom: 40px; /* Lebih menapak tanah */
+    bottom: 30px; /* pastikan menapak tanah */
   }
   .obstacle, .powerup {
     position: absolute;
@@ -66,16 +67,17 @@
     bottom: 50px;
   }
   .flying {
-    bottom: 80px;
+    bottom: 80px; /* kelelawar lebih rendah */
     font-size: 35px;
   }
   .duck-required {
-    position: absolute;
+    width: 25px;
+    height: 220px;
     top: 0;
-    width: 20px;
-    height: 180px;
+    bottom: auto;
     background-color: black;
-    left: 0;
+    border-radius: 3px;
+    user-select: none;
   }
   .powerup.jump {
     bottom: 130px;
@@ -85,17 +87,435 @@
     bottom: 60px;
     font-size: 50px;
   }
+  #info {
+    margin: 8px;
+    color: #444;
+  }
+  #instructions {
+    max-width: 1000px;
+    margin-top: 16px;
+    font-size: 16px;
+    color: #222;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #f9f9f9;
+  }
+  #instructions h3 {
+    margin-top: 0;
+  }
+#credit {
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  color: white;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: Arial, sans-serif;
+  z-index: 999;
+  pointer-events: none; /* agar tidak mengganggu kontrol game */
+}
+
+#credit a {
+  color: #00ffff;
+  text-decoration: none;
+  pointer-events: auto; /* tetap bisa klik link */
+}
+
+#credit a:hover {
+  text-decoration: underline;
+}
+
+
+  
 </style>
 </head>
+
 <body>
+
 <div id="scoreboard">Score: 0 | Health: 3 | Stamina: 100 | High Score: 0</div>
 <div id="game">
   <div id="monster" class="entity">🦖</div>
   <div id="dino" class="entity">🦕</div>
   <div id="ground"></div>
 </div>
+
+
+<div id="info">Space = Jump | Shift = Sprint | ArrowDown = Duck | Enter = Restart</div>
+
+<div id="instructions">
+  <h3>Petunjuk Permainan</h3>
+  <ul>
+    <li><b>🦕 Dino</b> kamu harus bertahan selama mungkin dari kejaran monster 🦖.</li>
+    <li><b>Space</b> = Melompat (untuk menghindari kaktus, kelelawar, balok hitam, dan mengambil powerup udara)</li>
+    <li><b>Shift</b> = Sprint / Lari cepat (menggunakan stamina)</li>
+    <li><b>↓ (Arrow Down)</b> = Menunduk (untuk menghindari kelelawar dan balok hitam panjang)</li>
+    <li><b>Enter</b> = Mulai ulang jika game over</li>
+    <li>Hindari rintangan: <b>🌵 kaktus</b>, <b>🦇 kelelawar</b>, dan <b>⬛ balok hitam</b> (wajib menunduk)</li>
+    <li>Ambil powerup tanah: <b>⚡</b> (isi stamina), <b>⬇️</b> (perlambat monster), <b>❤️</b> (tambah darah)</li>
+    <li>Ambil powerup udara (harus dilompat): <b>⚡</b> (isi stamina)</li>
+    <li><b>Health:</b> Kamu punya 3 nyawa. Tabrak rintangan = -1 nyawa</li>
+    <li><b>Stamina:</b> 100 maksimal. Sprint memakai stamina, berjalan biasa mengisi stamina perlahan.</li>
+    <li><b>Game Over:</b> Jika nyawa habis atau tertangkap monster</li>
+  </ul>
+  <p><i>Tips:</i> Gunakan sprint dengan bijak dan jaga stamina agar selalu cukup!</p>
+</div>
+
 <script>
-// Script lengkap akan disisipkan kembali di sini
+const dino = document.getElementById('dino');
+const monster = document.getElementById('monster');
+const ground = document.getElementById('ground');
+const scoreboard = document.getElementById('scoreboard');
+const game = document.getElementById('game');
+
+let isJumping = false;
+let isDucking = false;
+let dinoBottom = 43;
+let velocity = 0;
+const gravity = 0.7;
+const jumpVelocity = 16;
+let groundSpeed = 6;
+let sprinting = false;
+let obstacles = [];
+let obstacleTimer = 0;
+let monsterLeft = -200;
+let monsterSpeed = 0.2;
+let monsterSpeedLevel = 0;
+let score = 0;
+let highScore = localStorage.getItem('dinoEmojiScore') || 0;
+let maxHealth = 6;
+let health = 3;
+let stamina = 100;
+let maxStamina = 100;
+let staminaRegenRate = 0.2; // per frame berjalan biasa
+let staminaDrainRate = 0.8; // per frame sprint
+let gameOver = false;
+
+function updateScoreboard() {
+  scoreboard.textContent = `Score: ${score} | Health: ${health} | Stamina: ${Math.floor(stamina)} | High Score: ${highScore}`;
+}
+
+// Fungsi untuk cek jarak antar obstacles agar tidak terlalu berdekatan dan tidak beda tipe bertumpuk
+function canPlaceObstacle(newPos, newType) {
+  for (let obs of obstacles) {
+    if (Math.abs(obs.pos - newPos) < 220) {
+      // jarak kurang dari 220px terlalu dekat
+      // Cegah obstacle berbeda tipe (ground/flying/duck-required) berdekatan atau tumpang tindih
+      if (obs.type !== newType) return false;
+    }
+  }
+  return true;
+}
+
+function createObstacle() {
+  let type;
+  const lastType = obstacles.length ? obstacles[obstacles.length - 1].type : null;
+
+  // Tentukan type dengan aturan tidak menumpuk tipe berbeda dan acak
+  let attempts = 0;
+  do {
+    if (Math.random() < 0.12 && lastType !== 'duck-required') {
+      type = 'duck-required';
+    } else if (lastType === 'flying') {
+      type = 'ground';
+    } else if (lastType === 'ground') {
+      type = Math.random() < 0.3 ? 'flying' : 'ground';
+    } else {
+      type = Math.random() < 0.3 ? 'flying' : 'ground';
+    }
+
+    // Random posisi awal obstacle di luar kanan layar
+    var startX = game.clientWidth + 300 + Math.random() * 600;
+
+    attempts++;
+    if (attempts > 10) break; // mencegah infinite loop
+  } while (!canPlaceObstacle(startX, type));
+
+  const obs = document.createElement('div');
+  obs.classList.add('obstacle');
+  if (type === 'flying') {
+    obs.classList.add('flying');
+    obs.textContent = '🦇';
+  } else if (type === 'duck-required') {
+    obs.classList.add('duck-required');
+  } else {
+    obs.textContent = '🌵';
+  }
+  obs.style.left = startX + 'px';
+  game.appendChild(obs);
+  obstacles.push({ el: obs, pos: startX, type });
+}
+
+function createPowerup() {
+  const p = document.createElement('div');
+  p.classList.add('powerup');
+  let effect;
+  let r = Math.random();
+  if (r < 0.15) {
+    p.textContent = '⚡';
+    p.classList.add('ground');
+    effect = 'stamina';
+  } else if (r < 0.28) {
+    p.textContent = '⬇️';
+    p.classList.add('ground');
+    effect = 'slowMonster';
+  } else if (r < 0.33) {
+    p.textContent = '❤️';
+    p.classList.add('ground');
+    effect = 'health';
+  } else {
+    p.textContent = '⚡';
+    p.classList.add('jump');
+    effect = 'staminaJump';
+  }
+  let startX = game.clientWidth + 300 + Math.random() * 800;
+  p.style.left = startX + 'px';
+  game.appendChild(p);
+  obstacles.push({ el: p, pos: startX, type: 'powerup', effect });
+}
+
+function resetGame() {
+  obstacles.forEach(o => o.el.remove());
+  obstacles = [];
+  score = 0;
+  health = 3;
+  stamina = maxStamina;
+  gameOver = false;
+  dinoBottom = 43;
+  velocity = 0;
+  isJumping = false;
+  sprinting = false;
+  monsterLeft = -200;
+  dino.style.bottom = dinoBottom + 'px';
+  monster.style.left = monsterLeft + 'px';
+  groundSpeed = 6;
+  monsterSpeed = 0.2;
+  ground.style.animationDuration = '1.5s';
+  
+  updateScoreboard();
+
+  // ✅ Sembunyikan UI Game Over jika ada
+const gameOverUI = document.getElementById("gameOverScreen");
+if (gameOverUI) {
+  gameOverUI.style.display = "none";
+}
+
+
+  // ✅ Mulai ulang game loop (jika belum ada)
+  requestAnimationFrame(gameLoop);
+}
+
+function showGameOver(reason) {
+  gameOver = true;
+  const screen = document.getElementById('gameOverScreen');
+  screen.textContent = `Game Over: ${reason} | Skor: ${score}`;
+  screen.style.display = 'block';
+
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('dinoEmojiScore', score);
+  }
+
+  updateScoreboard();
+}
+
+function gameLoop() {
+  if (gameOver) return;
+
+  if (isJumping) {
+    velocity -= gravity;
+    dinoBottom += velocity;
+    if (dinoBottom <= 43) {
+      dinoBottom = 43;
+      isJumping = false;
+    }
+    dino.style.bottom = dinoBottom + 'px';
+  }
+
+  // Update stamina
+  if (sprinting) {
+    stamina -= staminaDrainRate;
+    if (stamina <= 0) {
+      stamina = 0;
+      sprinting = false;
+      groundSpeed = 6;
+      ground.style.animationDuration = '1.5s';
+    }
+  } else if (stamina < maxStamina) {
+    stamina += staminaRegenRate;
+    if (stamina > maxStamina) stamina = maxStamina;
+  }
+
+  // Update obstacles
+  obstacles.forEach((obs, idx) => {
+    obs.pos -= groundSpeed;
+    obs.el.style.left = obs.pos + 'px';
+
+    const near = obs.pos < 190 && obs.pos > 120;
+    if (near && obs.type !== 'powerup') {
+      let hit = false;
+      if (obs.type === 'ground') {
+        hit = dinoBottom <= 90;
+      } else if (obs.type === 'flying') {
+        hit = !(isDucking || dinoBottom > 90);
+      } else if (obs.type === 'duck-required') {
+        hit = !isDucking;
+      }
+      if (hit) {
+        health--;
+        obs.el.remove();
+        obstacles.splice(idx, 1);
+        
+        updateScoreboard();
+        if (health <= 0) {
+          gameOver = true;
+          scoreboard.textContent = `Game Over! Score: ${score} | High Score: ${highScore}`;
+        }
+      }
+    } else if (near && obs.type === 'powerup') {
+      if (obs.effect === 'stamina') {
+        stamina = Math.min(stamina + 35, maxStamina);
+        obs.el.remove();
+        obstacles.splice(idx, 1);
+      }
+      else if (obs.effect === 'slowMonster') {
+        monsterSpeed = Math.max(monsterSpeed - 0.05, 0.05);
+        obs.el.remove();
+        obstacles.splice(idx, 1);
+      }
+      else if (obs.effect === 'health') {
+  if (health < maxHealth) health++;
+  updateScoreboard();
+  obs.el.remove();
+  obstacles.splice(idx, 1);
+}
+
+      else if (obs.effect === 'staminaJump') {
+        // Ambil powerup staminaJump hanya jika sedang melompat dan posisinya cukup tinggi
+        if (isJumping && dinoBottom > 120) {
+          stamina = Math.min(stamina + 20, maxStamina);
+          obs.el.remove();
+          obstacles.splice(idx, 1);
+        }
+      }
+    }
+
+if (obs.pos < -60) {
+  obs.el.remove();
+  obstacles.splice(idx, 1);
+  if (obs.type !== 'powerup') {
+    score += 300;
+
+    // Hanya tingkatkan monsterSpeed jika sudah mencapai level tertentu
+    let newLevel = Math.floor(score / 1500);
+    if (newLevel > monsterSpeedLevel) {
+      monsterSpeedLevel = newLevel;
+      monsterSpeed += 0.002; // tingkatkan sedikit
+      const maxMonsterSpeed = 0.03;
+      if (monsterSpeed > maxMonsterSpeed) monsterSpeed = maxMonsterSpeed;
+    }
+
+    updateScoreboard();
+  }
+}
+
+  });
+
+  // Monster gerak
+  if (!sprinting) {
+    if (monsterLeft < 120) monsterLeft += monsterSpeed;
+  } else {
+    monsterLeft -= 0.7;
+    if (monsterLeft < -200) monsterLeft = -200;
+  }
+  monster.style.left = monsterLeft + 'px';
+
+if (monsterLeft + 120 > 150) {
+  showGameOver("Tertangkap monster");
+}
+if (health <= 0) {
+  showGameOver("Nyawa habis");
+}
+
+
+  obstacleTimer -= groundSpeed;
+  if (obstacleTimer <= 0) {
+    if (Math.random() < 0.3) {
+      createPowerup();
+    } else {
+      createObstacle();
+    }
+    obstacleTimer = 300 + Math.random() * 600;
+  }
+
+  updateScoreboard();
+  requestAnimationFrame(gameLoop);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !gameOver) {
+    if (!isJumping) {
+      isJumping = true;
+      velocity = jumpVelocity;
+    }
+  }
+  if (e.code === 'ShiftLeft') {
+    if (stamina > 0) {
+      sprinting = true;
+      groundSpeed = Math.min(groundSpeed + 4, 14);
+      ground.style.animationDuration = (1.5 / (groundSpeed / 6)) + 's';
+    }
+  }
+  if (e.code === 'ArrowDown') {
+    isDucking = true;
+    dino.style.transform = 'scaleX(-1) scaleY(0.5) translateY(30px)';
+  }
+  if (e.code === 'Enter' && gameOver) {
+    resetGame();
+    gameLoop();
+  }
+});
+
+document.addEventListener('keyup', e => {
+  if (e.code === 'ShiftLeft') {
+    sprinting = false;
+    groundSpeed = 6;
+    ground.style.animationDuration = '1.5s';
+  }
+  if (e.code === 'ArrowDown') {
+    isDucking = false;
+    dino.style.transform = 'scaleX(-1)';
+  }
+});
+
+resetGame();
+gameLoop();
 </script>
+<div id="gameOverScreen" style="
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  font-size: 32px;
+  font-weight: bold;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  text-align: center;
+  padding: 20px;
+  box-sizing: border-box;
+">
+  Game Over! Tekan Enter untuk mengulang
+</div>
+<div id="credit">Made by Grendy Aditya — <a href="https://github.com/grendyaditya" target="_blank">GitHub</a></div>
+
+
 </body>
 </html>
