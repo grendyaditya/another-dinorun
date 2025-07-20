@@ -461,7 +461,7 @@ document.addEventListener('keyup', e => {
     groundSpeed = 6;
     ground.style.animationDuration = '1.5s';
   }
-  if (e.code === 'ArrowDown') {
+if (e.code === 'ArrowDown' || e.code === 'KeyS') {
     isDucking = false;
     dino.style.transform = 'scaleX(-1)';
   }
