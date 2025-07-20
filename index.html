@@ -104,32 +104,6 @@
   #instructions h3 {
     margin-top: 0;
   }
-#credit {
-  position: fixed;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 14px;
-  color: white;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-family: Arial, sans-serif;
-  z-index: 999;
-  pointer-events: none; /* agar tidak mengganggu kontrol game */
-}
-
-#credit a {
-  color: #00ffff;
-  text-decoration: none;
-  pointer-events: auto; /* tetap bisa klik link */
-}
-
-#credit a:hover {
-  text-decoration: underline;
-}
-
-
   
 </style>
 </head>
@@ -144,7 +118,7 @@
 </div>
 
 
-<div id="info">Space = Jump | Shift = Sprint | ArrowDown = Duck | Enter = Restart</div>
+<div id="info">Space/ArrowUp/W = Jump | Shift = Sprint | ArrowDown/S = Duck | Enter = Restart</div>
 
 <div id="instructions">
   <h3>Petunjuk Permainan</h3>
@@ -456,7 +430,8 @@ if (health <= 0) {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && !gameOver) {
+if ((e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') && !gameOver) {
+
     if (!isJumping) {
       isJumping = true;
       velocity = jumpVelocity;
@@ -469,7 +444,8 @@ document.addEventListener('keydown', e => {
       ground.style.animationDuration = (1.5 / (groundSpeed / 6)) + 's';
     }
   }
-  if (e.code === 'ArrowDown') {
+if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+
     isDucking = true;
     dino.style.transform = 'scaleX(-1) scaleY(0.5) translateY(30px)';
   }
@@ -514,7 +490,6 @@ gameLoop();
 ">
   Game Over! Tekan Enter untuk mengulang
 </div>
-<div id="credit">Made by Grendy Aditya — <a href="https://github.com/grendyaditya" target="_blank">GitHub</a></div>
 
 
 </body>
